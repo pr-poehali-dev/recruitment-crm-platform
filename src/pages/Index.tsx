@@ -784,133 +784,229 @@ function DealCard({ deal, onBack }: { deal: typeof DEALS_DATA[0]; onBack: () => 
 }
 
 // ── DIGITIZING ────────────────────────────────────────────────────────────────
-function Digitizing() {
-  const records = [
-    {
-      id: 1,
-      number: "ЗАЯ-2026-001",
-      position: "Бухгалтер",
-      city: "Москва",
-      amount: "120 000 ₽",
-      resourceCostPlan: "15 000 ₽",
-      resourceCostFact: "12 400 ₽",
-      recruiter: "Петрова О.В.",
-      stage: "Стажировка",
-      date: "10.04.2026",
-      stats: {
-        resumesViewed: 148,
-        callsHHFree: 34,
-        callsHHPaid: 12,
-        callsAvito: 8,
-        interviews: 9,
-        assessments: 6,
-        shows: 4,
-        internships: 2,
-      },
-    },
-  ];
+const DIG_RECORDS = [
+  {
+    id: 1,
+    number: "ЗАЯ-2026-001",
+    position: "Бухгалтер",
+    city: "Москва",
+    amount: 120000,
+    resourcePlan: 15000,
+    resourceFact: 12400,
+    recruiter: "Петрова О.В.",
+    stage: "Стажировка",
+    date: "10.04.2026",
+    resumesViewed: 148,
+    callsHHFree: 34,
+    callsHHPaid: 12,
+    callsAvito: 8,
+    interviews: 9,
+    assessments: 6,
+    shows: 4,
+    internships: 2,
+  },
+  {
+    id: 2,
+    number: "ЗАЯ-2026-002",
+    position: "Менеджер по продажам",
+    city: "Санкт-Петербург",
+    amount: 95000,
+    resourcePlan: 12000,
+    resourceFact: 9800,
+    recruiter: "Иванова К.С.",
+    stage: "Гарантийный период",
+    date: "05.04.2026",
+    resumesViewed: 210,
+    callsHHFree: 52,
+    callsHHPaid: 18,
+    callsAvito: 14,
+    interviews: 15,
+    assessments: 10,
+    shows: 6,
+    internships: 3,
+  },
+  {
+    id: 3,
+    number: "ЗАЯ-2026-003",
+    position: "Юрист",
+    city: "Москва",
+    amount: 110000,
+    resourcePlan: 10000,
+    resourceFact: 3200,
+    recruiter: "Петрова О.В.",
+    stage: "Поиск",
+    date: "18.04.2026",
+    resumesViewed: 67,
+    callsHHFree: 18,
+    callsHHPaid: 4,
+    callsAvito: 2,
+    interviews: 3,
+    assessments: 2,
+    shows: 1,
+    internships: 0,
+  },
+];
 
-  const stageColor: Record<string, string> = {
-    "Поиск": "bg-blue-50 text-blue-600",
-    "Стажировка": "bg-orange-50 text-orange-600",
-    "Стоп": "bg-red-50 text-red-600",
-    "Гарантийный период": "bg-purple-50 text-purple-600",
-    "Закрыта": "bg-green-50 text-green-600",
+const STAGE_COLOR: Record<string, string> = {
+  "Поиск": "bg-blue-50 text-blue-600",
+  "Стажировка": "bg-orange-50 text-orange-600",
+  "Стоп": "bg-red-50 text-red-600",
+  "Гарантийный период": "bg-purple-50 text-purple-600",
+  "Закрыта": "bg-green-50 text-green-600",
+};
+
+function fmt(n: number) {
+  return n.toLocaleString("ru-RU") + " ₽";
+}
+
+function Digitizing() {
+  const [expanded, setExpanded] = useState<number | null>(null);
+
+  const totals = {
+    resumesViewed: DIG_RECORDS.reduce((s, r) => s + r.resumesViewed, 0),
+    callsHHFree: DIG_RECORDS.reduce((s, r) => s + r.callsHHFree, 0),
+    callsHHPaid: DIG_RECORDS.reduce((s, r) => s + r.callsHHPaid, 0),
+    callsAvito: DIG_RECORDS.reduce((s, r) => s + r.callsAvito, 0),
+    interviews: DIG_RECORDS.reduce((s, r) => s + r.interviews, 0),
+    assessments: DIG_RECORDS.reduce((s, r) => s + r.assessments, 0),
+    shows: DIG_RECORDS.reduce((s, r) => s + r.shows, 0),
+    internships: DIG_RECORDS.reduce((s, r) => s + r.internships, 0),
+    resourcePlan: DIG_RECORDS.reduce((s, r) => s + r.resourcePlan, 0),
+    resourceFact: DIG_RECORDS.reduce((s, r) => s + r.resourceFact, 0),
   };
 
-  const [expanded, setExpanded] = useState<number | null>(null);
+  const thClass = "text-xs font-medium text-muted-foreground uppercase tracking-wide px-3 py-3 text-center whitespace-nowrap border-r border-border last:border-0";
+  const thLeftClass = "text-xs font-medium text-muted-foreground uppercase tracking-wide px-3 py-3 text-left whitespace-nowrap border-r border-border";
+  const tdClass = "px-3 py-3 text-sm font-mono-nums text-center text-foreground border-r border-border last:border-0";
+  const tdLeftClass = "px-3 py-3 text-sm text-foreground border-r border-border";
 
   return (
     <div>
       <PageHeader
         title="Оцифровка"
-        subtitle="Отчёт по активностям рекрутинга"
+        subtitle={`Отчёт по заявкам с авансом · ${DIG_RECORDS.length} заявок`}
         action={
           <button className="flex items-center gap-2 bg-primary text-primary-foreground text-sm px-4 py-2 rounded hover:bg-primary/90 transition-colors">
-            <Icon name="Plus" size={14} />
-            Новая запись
+            <Icon name="Download" size={14} />
+            Экспорт
           </button>
         }
       />
-      <div className="p-8 space-y-4">
-        {records.map((r) => (
-          <div key={r.id} className="bg-card border border-border rounded-lg overflow-hidden animate-fade-in">
-            <div
-              className="px-5 py-4 flex items-center gap-4 cursor-pointer hover:bg-muted/30 transition-colors"
-              onClick={() => setExpanded(expanded === r.id ? null : r.id)}
-            >
-              <Icon name={expanded === r.id ? "ChevronDown" : "ChevronRight"} size={15} className="text-muted-foreground shrink-0" />
-              <span className="font-mono-nums text-xs text-muted-foreground w-28 shrink-0">{r.number}</span>
-              <span className="font-medium text-foreground flex-1">{r.position}</span>
-              <span className="text-sm text-muted-foreground w-24">{r.city}</span>
-              <span className="font-mono-nums text-sm text-foreground w-28">{r.amount}</span>
-              <span className="text-sm text-muted-foreground w-32">{r.recruiter}</span>
-              <span className={`badge-status ${stageColor[r.stage] ?? "bg-muted text-muted-foreground"} w-32 justify-center`}>
-                <span className="w-1.5 h-1.5 rounded-full bg-current" />{r.stage}
-              </span>
-              <span className="font-mono-nums text-xs text-muted-foreground w-24 text-right">{r.date}</span>
-            </div>
-
-            {expanded === r.id && (
-              <div className="border-t border-border p-5 space-y-5">
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="bg-muted/40 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-semibold font-mono-nums text-foreground">{r.stats.resumesViewed}</div>
-                    <div className="text-xs text-muted-foreground mt-1">Просмотрено резюме</div>
-                  </div>
-                  <div className="bg-muted/40 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-semibold font-mono-nums text-foreground">{r.stats.callsHHFree + r.stats.callsHHPaid + r.stats.callsAvito}</div>
-                    <div className="text-xs text-muted-foreground mt-1">Всего звонков</div>
-                  </div>
-                  <div className="bg-muted/40 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-semibold font-mono-nums text-foreground">{r.stats.interviews}</div>
-                    <div className="text-xs text-muted-foreground mt-1">Собеседований</div>
-                  </div>
-                  <div className="bg-muted/40 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-semibold font-mono-nums text-foreground">{r.stats.internships}</div>
-                    <div className="text-xs text-muted-foreground mt-1">Стажировок</div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-5">
-                  <div>
-                    <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-3">Детализация активностей</div>
-                    <div className="space-y-2">
-                      {[
-                        { label: "Звонки HH.ru (бесплатно)", value: r.stats.callsHHFree },
-                        { label: "Звонки HH.ru (платно)", value: r.stats.callsHHPaid },
-                        { label: "Звонки Авито (платно)", value: r.stats.callsAvito },
-                        { label: "Направленных оценок", value: r.stats.assessments },
-                        { label: "Показов кандидатов", value: r.stats.shows },
-                      ].map((item) => (
-                        <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
-                          <span className="text-sm text-muted-foreground">{item.label}</span>
-                          <span className="font-mono-nums text-sm font-medium text-foreground">{item.value}</span>
+      <div className="p-8">
+        <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                {/* Группы колонок */}
+                <tr className="bg-muted/50 border-b border-border">
+                  <th colSpan={7} className="text-xs font-semibold text-muted-foreground px-3 py-2 text-left border-r border-border">Заявка</th>
+                  <th colSpan={8} className="text-xs font-semibold text-muted-foreground px-3 py-2 text-center border-r border-border">Активности</th>
+                  <th colSpan={3} className="text-xs font-semibold text-muted-foreground px-3 py-2 text-center">Бюджет на подбор</th>
+                </tr>
+                <tr className="bg-muted/20 border-b border-border">
+                  <th className={thLeftClass}>№ Заявки</th>
+                  <th className={thLeftClass}>Должность</th>
+                  <th className={thLeftClass}>Город</th>
+                  <th className={thLeftClass}>Рекрутер</th>
+                  <th className={thLeftClass}>Стадия</th>
+                  <th className={thLeftClass}>Дата</th>
+                  <th className={`${thClass} border-r-2 border-border`}>Стоимость</th>
+                  <th className={thClass}>Резюме</th>
+                  <th className={thClass}>HH бесп.</th>
+                  <th className={thClass}>HH платн.</th>
+                  <th className={thClass}>Авито</th>
+                  <th className={thClass}>Собес.</th>
+                  <th className={thClass}>Оценки</th>
+                  <th className={thClass}>Показы</th>
+                  <th className={`${thClass} border-r-2 border-border`}>Стажир.</th>
+                  <th className={thClass}>План</th>
+                  <th className={thClass}>Факт</th>
+                  <th className={thClass}>Остаток</th>
+                </tr>
+              </thead>
+              <tbody>
+                {DIG_RECORDS.map((r) => (
+                  <>
+                    <tr
+                      key={r.id}
+                      className="border-b border-border hover:bg-muted/30 transition-colors cursor-pointer"
+                      onClick={() => setExpanded(expanded === r.id ? null : r.id)}
+                    >
+                      <td className={tdLeftClass}>
+                        <div className="flex items-center gap-1.5">
+                          <Icon name={expanded === r.id ? "ChevronDown" : "ChevronRight"} size={13} className="text-muted-foreground shrink-0" />
+                          <span className="font-mono-nums text-xs font-medium">{r.number}</span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-3">Бюджет на подбор</div>
-                    <div className="space-y-2">
-                      {[
-                        { label: "Стоимость заявки", value: r.amount },
-                        { label: "Бюджет на ресурсы (план)", value: r.resourceCostPlan },
-                        { label: "Бюджет на ресурсы (факт)", value: r.resourceCostFact },
-                        { label: "Остаток бюджета", value: `${(parseInt(r.resourceCostPlan) - parseInt(r.resourceCostFact)).toLocaleString()} ₽` },
-                      ].map((item) => (
-                        <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
-                          <span className="text-sm text-muted-foreground">{item.label}</span>
-                          <span className="font-mono-nums text-sm font-medium text-foreground">{item.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+                      </td>
+                      <td className={`${tdLeftClass} font-medium`}>{r.position}</td>
+                      <td className={`${tdLeftClass} text-muted-foreground`}>{r.city}</td>
+                      <td className={`${tdLeftClass} text-muted-foreground`}>{r.recruiter}</td>
+                      <td className={tdLeftClass}>
+                        <span className={`badge-status ${STAGE_COLOR[r.stage] ?? "bg-muted text-muted-foreground"}`}>
+                          <span className="w-1.5 h-1.5 rounded-full bg-current" />{r.stage}
+                        </span>
+                      </td>
+                      <td className={`${tdLeftClass} text-muted-foreground text-xs`}>{r.date}</td>
+                      <td className={`${tdClass} border-r-2 border-border font-semibold`}>{fmt(r.amount)}</td>
+                      <td className={tdClass}>{r.resumesViewed}</td>
+                      <td className={tdClass}>{r.callsHHFree}</td>
+                      <td className={tdClass}>{r.callsHHPaid}</td>
+                      <td className={tdClass}>{r.callsAvito}</td>
+                      <td className={tdClass}>{r.interviews}</td>
+                      <td className={tdClass}>{r.assessments}</td>
+                      <td className={tdClass}>{r.shows}</td>
+                      <td className={`${tdClass} border-r-2 border-border`}>{r.internships}</td>
+                      <td className={tdClass}>{fmt(r.resourcePlan)}</td>
+                      <td className={tdClass}>{fmt(r.resourceFact)}</td>
+                      <td className={`${tdClass} ${r.resourcePlan - r.resourceFact >= 0 ? "text-green-600" : "text-red-500"} font-semibold`}>
+                        {fmt(r.resourcePlan - r.resourceFact)}
+                      </td>
+                    </tr>
+                    {expanded === r.id && (
+                      <tr key={`${r.id}-exp`} className="border-b border-border bg-blue-50/40">
+                        <td colSpan={18} className="px-5 py-4">
+                          <div className="grid grid-cols-4 gap-3">
+                            {[
+                              { label: "Итого звонков", value: r.callsHHFree + r.callsHHPaid + r.callsAvito },
+                              { label: "Конверсия в собес.", value: `${Math.round((r.interviews / (r.callsHHFree + r.callsHHPaid + r.callsAvito)) * 100)}%` },
+                              { label: "Конверсия в стажир.", value: `${Math.round((r.internships / Math.max(r.interviews, 1)) * 100)}%` },
+                              { label: "Освоено бюджета", value: `${Math.round((r.resourceFact / r.resourcePlan) * 100)}%` },
+                            ].map((item) => (
+                              <div key={item.label} className="bg-white border border-border rounded-lg px-4 py-3">
+                                <div className="text-xs text-muted-foreground mb-1">{item.label}</div>
+                                <div className="text-lg font-semibold font-mono-nums text-foreground">{item.value}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                ))}
+              </tbody>
+              {/* Итоговая строка */}
+              <tfoot>
+                <tr className="bg-muted/50 border-t-2 border-border">
+                  <td colSpan={6} className="px-3 py-3 text-xs font-semibold text-foreground uppercase tracking-wide">Итого по всем заявкам</td>
+                  <td className={`${tdClass} border-r-2 border-border font-bold text-foreground`}>{fmt(DIG_RECORDS.reduce((s, r) => s + r.amount, 0))}</td>
+                  <td className={`${tdClass} font-bold`}>{totals.resumesViewed}</td>
+                  <td className={`${tdClass} font-bold`}>{totals.callsHHFree}</td>
+                  <td className={`${tdClass} font-bold`}>{totals.callsHHPaid}</td>
+                  <td className={`${tdClass} font-bold`}>{totals.callsAvito}</td>
+                  <td className={`${tdClass} font-bold`}>{totals.interviews}</td>
+                  <td className={`${tdClass} font-bold`}>{totals.assessments}</td>
+                  <td className={`${tdClass} font-bold`}>{totals.shows}</td>
+                  <td className={`${tdClass} border-r-2 border-border font-bold`}>{totals.internships}</td>
+                  <td className={`${tdClass} font-bold`}>{fmt(totals.resourcePlan)}</td>
+                  <td className={`${tdClass} font-bold`}>{fmt(totals.resourceFact)}</td>
+                  <td className={`${tdClass} font-bold ${totals.resourcePlan - totals.resourceFact >= 0 ? "text-green-600" : "text-red-500"}`}>
+                    {fmt(totals.resourcePlan - totals.resourceFact)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );
