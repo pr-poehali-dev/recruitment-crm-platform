@@ -1,14 +1,14 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 
-type Section = "dashboard" | "clients" | "tasks" | "recruiting" | "digitizing";
+type Section = "dashboard" | "clients" | "tasks" | "deals" | "digitizing";
 
 const NAV = [
   { id: "dashboard", label: "Дашборд", icon: "LayoutDashboard" },
   { id: "clients", label: "Клиенты", icon: "Users" },
   { id: "tasks", label: "Задачи", icon: "CheckSquare" },
-  { id: "recruiting", label: "Рекрутинг", icon: "UserSearch" },
-  { id: "digitizing", label: "Оцифровка", icon: "Database" },
+  { id: "deals", label: "Сделки", icon: "Briefcase" },
+  { id: "digitizing", label: "Оцифровка", icon: "BarChart2" },
 ] as const;
 
 export default function Index() {
@@ -21,7 +21,7 @@ export default function Index() {
         {active === "dashboard" && <Dashboard />}
         {active === "clients" && <Clients />}
         {active === "tasks" && <Tasks />}
-        {active === "recruiting" && <Recruiting />}
+        {active === "deals" && <Deals />}
         {active === "digitizing" && <Digitizing />}
       </main>
     </div>
@@ -72,6 +72,26 @@ function PageHeader({ title, subtitle, action }: { title: string; subtitle?: str
   );
 }
 
+function SectionBlock({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-card border border-border rounded-lg overflow-hidden">
+      <div className="px-5 py-3 border-b border-border bg-muted/30">
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{title}</span>
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  );
+}
+
+function Field({ label, value }: { label: string; value?: string }) {
+  return (
+    <div>
+      <div className="text-xs text-muted-foreground mb-0.5">{label}</div>
+      <div className="text-sm text-foreground">{value || "—"}</div>
+    </div>
+  );
+}
+
 function StatCard({ label, value, delta, icon, color }: { label: string; value: string; delta?: string; icon: string; color: string }) {
   return (
     <div className="stat-card animate-fade-in">
@@ -87,12 +107,13 @@ function StatCard({ label, value, delta, icon, color }: { label: string; value: 
   );
 }
 
+// ── DASHBOARD ──────────────────────────────────────────────────────────────────
 function Dashboard() {
   const stats = [
-    { label: "Клиентов", value: "248", delta: "+12 за месяц", icon: "Users", color: "bg-blue-500/10 text-blue-400" },
-    { label: "Открытых задач", value: "34", delta: "8 просрочено", icon: "CheckSquare", color: "bg-orange-500/10 text-orange-400" },
-    { label: "Вакансий", value: "7", delta: "3 активных", icon: "UserSearch", color: "bg-purple-500/10 text-purple-400" },
-    { label: "Оцифровано", value: "1 240", delta: "за текущий месяц", icon: "Database", color: "bg-green-500/10 text-green-400" },
+    { label: "Клиентов", value: "248", delta: "+12 за месяц", icon: "Users", color: "bg-blue-500/10 text-blue-600" },
+    { label: "Открытых задач", value: "34", delta: "8 просрочено", icon: "CheckSquare", color: "bg-orange-500/10 text-orange-500" },
+    { label: "Активных сделок", value: "7", delta: "3 в работе", icon: "Briefcase", color: "bg-purple-500/10 text-purple-500" },
+    { label: "Оцифровано", value: "1 240", delta: "за текущий месяц", icon: "BarChart2", color: "bg-green-500/10 text-green-600" },
   ];
 
   const recentClients = [
@@ -109,7 +130,6 @@ function Dashboard() {
         <div className="grid grid-cols-4 gap-4">
           {stats.map((s) => <StatCard key={s.label} {...s} />)}
         </div>
-
         <div className="grid grid-cols-3 gap-6">
           <div className="col-span-2 bg-card border border-border rounded-lg">
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
@@ -137,7 +157,6 @@ function Dashboard() {
               </tbody>
             </table>
           </div>
-
           <div className="space-y-4">
             <div className="bg-card border border-border rounded-lg p-5">
               <div className="text-sm font-medium text-foreground mb-4">Задачи сегодня</div>
@@ -157,14 +176,13 @@ function Dashboard() {
                 ))}
               </div>
             </div>
-
             <div className="bg-card border border-border rounded-lg p-5">
-              <div className="text-sm font-medium text-foreground mb-4">Воронка рекрутинга</div>
+              <div className="text-sm font-medium text-foreground mb-4">Воронка сделок</div>
               {[
-                { stage: "Отклики", count: 47, pct: 100 },
-                { stage: "Скрининг", count: 28, pct: 60 },
-                { stage: "Интервью", count: 11, pct: 23 },
-                { stage: "Оффер", count: 3, pct: 6 },
+                { stage: "Поиск", count: 12, pct: 100 },
+                { stage: "Стажировка", count: 7, pct: 58 },
+                { stage: "Гарантийный период", count: 4, pct: 33 },
+                { stage: "Закрыта", count: 3, pct: 25 },
               ].map((s) => (
                 <div key={s.stage} className="mb-3">
                   <div className="flex justify-between text-xs mb-1">
@@ -184,21 +202,43 @@ function Dashboard() {
   );
 }
 
+// ── CLIENTS ───────────────────────────────────────────────────────────────────
+const CLIENTS_DATA = [
+  {
+    id: 1,
+    brand: "Альфа",
+    legalName: "ООО «Альфа Групп»",
+    status: "Активный",
+    lpr: { fio: "Иванов Александр Петрович", position: "Генеральный директор", phone: "+7 495 123-45-67", telegram: "@ivanov_ap", email: "ivanov@alpha.ru" },
+    lprAssistant: { fio: "Смирнова Ольга Владимировна", position: "Помощник руководителя", phone: "+7 495 123-45-68", telegram: "@smirnova_ov", email: "smirnova@alpha.ru" },
+    requisites: { inn: "7701234567", kpp: "770101001", ogrn: "1027700123456", legalAddress: "г. Москва, ул. Ленина, д. 1", bank: "ПАО «Сбербанк»", bik: "044525225", account: "40702810123456789012", corrAccount: "30101810400000000225" },
+    contract: "Договор №А-2024-001 от 15.01.2024",
+  },
+  {
+    id: 2,
+    brand: "Техносфера",
+    legalName: "АО «Техносфера»",
+    status: "В работе",
+    lpr: { fio: "Сидоров Виктор Константинович", position: "Директор по персоналу", phone: "+7 499 345-67-89", telegram: "@sidorov_vk", email: "sidorov@techno.ru" },
+    lprAssistant: { fio: "Козлова Наталья Игоревна", position: "HR-менеджер", phone: "+7 499 345-67-90", telegram: "@kozlova_ni", email: "kozlova@techno.ru" },
+    requisites: { inn: "7703456789", kpp: "770301001", ogrn: "1027700345678", legalAddress: "г. Москва, пр-т Мира, д. 25", bank: "АО «Альфа-Банк»", bik: "044525593", account: "40702810345678901234", corrAccount: "30101810200000000593" },
+    contract: "Договор №Т-2025-014 от 03.03.2025",
+  },
+];
+
 function Clients() {
-  const clients = [
-    { name: "ООО «Альфа Групп»", inn: "7701234567", contact: "Иванов А.П.", phone: "+7 495 123-45-67", status: "Активный", revenue: "1 240 000 ₽", since: "янв 2024" },
-    { name: "ИП Петрова М.С.", inn: "7702345678", contact: "Петрова М.С.", phone: "+7 916 234-56-78", status: "Новый", revenue: "—", since: "апр 2026" },
-    { name: "АО «Техносфера»", inn: "7703456789", contact: "Сидоров В.К.", phone: "+7 499 345-67-89", status: "В работе", revenue: "560 000 ₽", since: "мар 2025" },
-    { name: "ООО «Магнит Трейд»", inn: "7704567890", contact: "Козлов Р.Н.", phone: "+7 926 456-78-90", status: "Активный", revenue: "3 100 000 ₽", since: "авг 2023" },
-    { name: "ЗАО «СтройКом»", inn: "7705678901", contact: "Лебедев С.И.", phone: "+7 495 567-89-01", status: "Пауза", revenue: "780 000 ₽", since: "май 2024" },
-    { name: "ООО «Прогресс»", inn: "7706789012", contact: "Новикова Е.А.", phone: "+7 903 678-90-12", status: "Активный", revenue: "2 450 000 ₽", since: "фев 2024" },
-  ];
+  const [selected, setSelected] = useState<number | null>(null);
+  const client = CLIENTS_DATA.find((c) => c.id === selected);
+
+  if (client) {
+    return <ClientCard client={client} onBack={() => setSelected(null)} />;
+  }
 
   return (
     <div>
       <PageHeader
         title="Клиенты"
-        subtitle={`${clients.length} компаний`}
+        subtitle={`${CLIENTS_DATA.length} компании`}
         action={
           <button className="flex items-center gap-2 bg-primary text-primary-foreground text-sm px-4 py-2 rounded hover:bg-primary/90 transition-colors">
             <Icon name="Plus" size={14} />
@@ -213,33 +253,27 @@ function Clients() {
               <Icon name="Search" size={13} className="text-muted-foreground" />
               <input placeholder="Поиск по клиентам..." className="bg-transparent text-sm outline-none text-foreground placeholder:text-muted-foreground w-full" />
             </div>
-            <button className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground px-3 py-1.5 border border-border rounded transition-colors">
-              <Icon name="Filter" size={13} />
-              Фильтр
-            </button>
           </div>
           <table className="w-full data-table">
             <thead>
               <tr>
-                <th className="pl-5">Компания</th>
-                <th>ИНН</th>
-                <th>Контакт</th>
+                <th className="pl-5">Бренд</th>
+                <th>Юр. лицо</th>
+                <th>ЛПР</th>
                 <th>Телефон</th>
-                <th>Статус</th>
-                <th>Выручка</th>
-                <th className="pr-5 text-right">С нами с</th>
+                <th>Договор</th>
+                <th className="pr-5 text-right">Статус</th>
               </tr>
             </thead>
             <tbody>
-              {clients.map((c) => (
-                <tr key={c.inn} className="hover:bg-muted/40 transition-colors cursor-pointer">
-                  <td className="pl-5 text-foreground font-medium">{c.name}</td>
-                  <td className="text-muted-foreground font-mono-nums text-xs">{c.inn}</td>
-                  <td className="text-muted-foreground">{c.contact}</td>
-                  <td className="text-muted-foreground font-mono-nums text-xs">{c.phone}</td>
-                  <td><StatusBadge status={c.status} /></td>
-                  <td className="font-mono-nums text-foreground">{c.revenue}</td>
-                  <td className="pr-5 text-right text-muted-foreground">{c.since}</td>
+              {CLIENTS_DATA.map((c) => (
+                <tr key={c.id} onClick={() => setSelected(c.id)} className="hover:bg-muted/40 transition-colors cursor-pointer">
+                  <td className="pl-5 text-foreground font-semibold">{c.brand}</td>
+                  <td className="text-muted-foreground">{c.legalName}</td>
+                  <td className="text-foreground">{c.lpr.fio}</td>
+                  <td className="text-muted-foreground font-mono-nums text-xs">{c.lpr.phone}</td>
+                  <td className="text-muted-foreground text-xs">{c.contract}</td>
+                  <td className="pr-5 text-right"><StatusBadge status={c.status} /></td>
                 </tr>
               ))}
             </tbody>
@@ -250,12 +284,89 @@ function Clients() {
   );
 }
 
+function ClientCard({ client, onBack }: { client: typeof CLIENTS_DATA[0]; onBack: () => void }) {
+  return (
+    <div>
+      <div className="flex items-center gap-3 px-8 py-6 border-b border-border">
+        <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Icon name="ChevronLeft" size={16} />
+          Клиенты
+        </button>
+        <span className="text-muted-foreground">/</span>
+        <h1 className="text-lg font-semibold text-foreground">{client.brand}</h1>
+        <StatusBadge status={client.status} />
+        <div className="ml-auto">
+          <button className="flex items-center gap-2 bg-primary text-primary-foreground text-sm px-4 py-2 rounded hover:bg-primary/90 transition-colors">
+            <Icon name="Edit2" size={13} />
+            Редактировать
+          </button>
+        </div>
+      </div>
+      <div className="p-8 space-y-5 max-w-5xl">
+        <div className="grid grid-cols-2 gap-5">
+          <SectionBlock title="Основное">
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Бренд" value={client.brand} />
+              <Field label="Юридическое лицо" value={client.legalName} />
+            </div>
+          </SectionBlock>
+          <SectionBlock title="Договор">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center">
+                <Icon name="FileText" size={16} className="text-blue-600" />
+              </div>
+              <div>
+                <div className="text-sm text-foreground font-medium">{client.contract}</div>
+                <button className="text-xs text-primary hover:underline mt-0.5">Прикрепить файл</button>
+              </div>
+            </div>
+          </SectionBlock>
+        </div>
+
+        <div className="grid grid-cols-2 gap-5">
+          <SectionBlock title="ЛПР — Лицо принимающее решения">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2"><Field label="ФИО" value={client.lpr.fio} /></div>
+              <Field label="Должность" value={client.lpr.position} />
+              <Field label="Телефон" value={client.lpr.phone} />
+              <Field label="Telegram" value={client.lpr.telegram} />
+              <Field label="E-mail" value={client.lpr.email} />
+            </div>
+          </SectionBlock>
+          <SectionBlock title="Помощник ЛПР">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2"><Field label="ФИО" value={client.lprAssistant.fio} /></div>
+              <Field label="Должность" value={client.lprAssistant.position} />
+              <Field label="Телефон" value={client.lprAssistant.phone} />
+              <Field label="Telegram" value={client.lprAssistant.telegram} />
+              <Field label="E-mail" value={client.lprAssistant.email} />
+            </div>
+          </SectionBlock>
+        </div>
+
+        <SectionBlock title="Реквизиты компании">
+          <div className="grid grid-cols-4 gap-4">
+            <Field label="ИНН" value={client.requisites.inn} />
+            <Field label="КПП" value={client.requisites.kpp} />
+            <Field label="ОГРН" value={client.requisites.ogrn} />
+            <div className="col-span-1" />
+            <div className="col-span-4"><Field label="Юридический адрес" value={client.requisites.legalAddress} /></div>
+            <Field label="Банк" value={client.requisites.bank} />
+            <Field label="БИК" value={client.requisites.bik} />
+            <Field label="Расчётный счёт" value={client.requisites.account} />
+            <Field label="Корр. счёт" value={client.requisites.corrAccount} />
+          </div>
+        </SectionBlock>
+      </div>
+    </div>
+  );
+}
+
+// ── TASKS ─────────────────────────────────────────────────────────────────────
 function Tasks() {
   const columns = [
     {
-      title: "К выполнению",
-      color: "text-muted-foreground",
-      dot: "bg-muted-foreground",
+      title: "К выполнению", color: "text-muted-foreground", dot: "bg-muted-foreground",
       tasks: [
         { title: "Подготовить КП для «Техносфера»", client: "АО «Техносфера»", due: "25 апр", priority: "Высокий" },
         { title: "Запросить документы у ИП Петровой", client: "ИП Петрова М.С.", due: "26 апр", priority: "Средний" },
@@ -263,22 +374,17 @@ function Tasks() {
       ],
     },
     {
-      title: "В работе",
-      color: "text-info",
-      dot: "bg-info",
+      title: "В работе", color: "text-info", dot: "bg-info",
       tasks: [
         { title: "Аудит договора «Альфа Групп»", client: "ООО «Альфа Групп»", due: "24 апр", priority: "Высокий" },
         { title: "Сверка данных оцифровки", client: "Внутренняя", due: "24 апр", priority: "Средний" },
       ],
     },
     {
-      title: "Выполнено",
-      color: "text-success",
-      dot: "bg-success",
+      title: "Выполнено", color: "text-success", dot: "bg-success",
       tasks: [
         { title: "Звонок Иванову А.П.", client: "ООО «Альфа Групп»", due: "22 апр", priority: "Низкий" },
         { title: "Отправить отчёт за март", client: "Внутренняя", due: "21 апр", priority: "Высокий" },
-        { title: "Обновить базу клиентов", client: "—", due: "20 апр", priority: "Средний" },
       ],
     },
   ];
@@ -306,7 +412,7 @@ function Tasks() {
               </div>
               <div className="space-y-3">
                 {col.tasks.map((t) => (
-                  <div key={t.title} className="bg-card border border-border rounded-lg p-4 hover:border-primary/30 transition-colors cursor-pointer animate-fade-in">
+                  <div key={t.title} className="bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-colors cursor-pointer">
                     <div className="text-sm font-medium text-foreground mb-2 leading-snug">{t.title}</div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground truncate">{t.client}</span>
@@ -326,176 +432,106 @@ function Tasks() {
   );
 }
 
-function Recruiting() {
-  const vacancies = [
-    {
-      title: "Бухгалтер", dept: "Финансы", opened: "10 апр",
-      candidates: [
-        { name: "Ковалёв Д.А.", stage: "Интервью", applied: "15 апр", score: 82 },
-        { name: "Смирнова Т.В.", stage: "Скрининг", applied: "18 апр", score: 67 },
-        { name: "Фёдоров И.С.", stage: "Отклик", applied: "20 апр", score: null },
+// ── DEALS ─────────────────────────────────────────────────────────────────────
+const DEALS_DATA = [
+  {
+    id: 1,
+    number: "ЗАЯ-2026-001",
+    client: "ООО «Альфа Групп»",
+    brand: "Альфа",
+    position: "Бухгалтер",
+    city: "Москва",
+    recruiter: "Петрова О.В.",
+    stage: "Стажировка",
+    openDate: "10.04.2026",
+    amount: "120 000 ₽",
+    advance: { amount: "60 000 ₽", date: "12.04.2026", paid: true },
+    extra: [
+      { label: "Доплата 1", amount: "30 000 ₽", date: "", paid: false },
+      { label: "Доплата 2", amount: "30 000 ₽", date: "", paid: false },
+    ],
+    profile: {
+      lpr: "Иванов Александр Петрович",
+      targetPosition: "Бухгалтер",
+      openDate: "10.04.2026",
+      reason: "Расширение штата",
+      structure: "Бухгалтерия подчиняется CFO, 3 сотрудника в отделе",
+      duties: [
+        { duty: "Ведение первичной документации", competence: "Знание 1С:Бухгалтерия, внимательность" },
+        { duty: "Подготовка налоговой отчётности", competence: "Знание НК РФ, опыт сдачи отчётов" },
+        { duty: "Работа с банком и платёжными поручениями", competence: "Опыт работы с банк-клиентом" },
+      ],
+      motivationProbation: "Оклад 60 000 ₽ на испытательный срок (3 мес.)",
+      motivationMain: "Оклад 80 000 ₽ + квартальная премия до 20%",
+      probationPeriod: "3 месяца",
+      probationConditions: "Выполнение KPI: своевременная сдача отчётов, отсутствие ошибок",
+      probationPay: "60 000 ₽",
+      softSkills: "Внимательность, ответственность, стрессоустойчивость, умение работать в команде",
+      additionalRequirements: "Опыт работы от 3 лет, знание МСФО будет плюсом",
+      age: "25–45 лет",
+      gender: "Не важно",
+      maritalStatus: "Не важно",
+      previousWork: [
+        { company: "Крупные производственные предприятия", position: "Бухгалтер / Главный бухгалтер", field: "Производство, торговля" },
       ],
     },
-    {
-      title: "Менеджер по продажам", dept: "Коммерция", opened: "5 апр",
-      candidates: [
-        { name: "Лазарева О.К.", stage: "Оффер", applied: "8 апр", score: 91 },
-        { name: "Морозов П.А.", stage: "Интервью", applied: "12 апр", score: 74 },
-      ],
-    },
-    {
-      title: "Юрист", dept: "Правовой", opened: "18 апр",
-      candidates: [
-        { name: "Степанова А.И.", stage: "Скрининг", applied: "21 апр", score: 58 },
-      ],
-    },
-  ];
+    invoice: { service: "Подбор персонала", qty: 1, price: "120 000 ₽", total: "120 000 ₽" },
+    act: { number: "АКТ-2026-001", date: "—", candidate: "—", guarantee: "3 месяца", file: null },
+  },
+];
+
+function Deals() {
+  const [selected, setSelected] = useState<number | null>(null);
+  const deal = DEALS_DATA.find((d) => d.id === selected);
+
+  if (deal) return <DealCard deal={deal} onBack={() => setSelected(null)} />;
 
   const stageColor: Record<string, string> = {
-    "Отклик": "bg-muted text-muted-foreground",
-    "Скрининг": "bg-blue-500/10 text-blue-400",
-    "Интервью": "bg-orange-500/10 text-orange-400",
-    "Оффер": "bg-green-500/10 text-green-400",
+    "Поиск": "bg-blue-50 text-blue-600",
+    "Стажировка": "bg-orange-50 text-orange-600",
+    "Стоп": "bg-red-50 text-red-600",
+    "Гарантийный период": "bg-purple-50 text-purple-600",
+    "Закрыта": "bg-green-50 text-green-600",
   };
 
   return (
     <div>
       <PageHeader
-        title="Рекрутинг"
-        subtitle="7 вакансий · 47 кандидатов"
+        title="Сделки"
+        subtitle="Заявки на подбор персонала"
         action={
           <button className="flex items-center gap-2 bg-primary text-primary-foreground text-sm px-4 py-2 rounded hover:bg-primary/90 transition-colors">
             <Icon name="Plus" size={14} />
-            Открыть вакансию
+            Новая заявка
           </button>
         }
       />
-      <div className="p-8 space-y-6">
-        {vacancies.map((v) => (
-          <div key={v.title} className="bg-card border border-border rounded-lg overflow-hidden animate-fade-in">
-            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
-                  <Icon name="Briefcase" size={14} className="text-muted-foreground" />
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-foreground">{v.title}</div>
-                  <div className="text-xs text-muted-foreground">{v.dept} · открыта {v.opened}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground">{v.candidates.length} кандидата(ов)</span>
-                <button className="text-xs text-primary hover:underline">Добавить кандидата</button>
-              </div>
-            </div>
-            <table className="w-full data-table">
-              <thead>
-                <tr>
-                  <th className="pl-5">Кандидат</th>
-                  <th>Этап</th>
-                  <th>Дата отклика</th>
-                  <th className="pr-5 text-right">Оценка</th>
-                </tr>
-              </thead>
-              <tbody>
-                {v.candidates.map((c) => (
-                  <tr key={c.name} className="hover:bg-muted/40 transition-colors cursor-pointer">
-                    <td className="pl-5 text-foreground font-medium">{c.name}</td>
-                    <td>
-                      <span className={`badge-status ${stageColor[c.stage]}`}>{c.stage}</span>
-                    </td>
-                    <td className="text-muted-foreground font-mono-nums text-xs">{c.applied}</td>
-                    <td className="pr-5 text-right">
-                      {c.score !== null
-                        ? <span className={`font-mono-nums text-sm font-medium ${c.score >= 80 ? "text-success" : c.score >= 60 ? "text-warning" : "text-muted-foreground"}`}>{c.score}</span>
-                        : <span className="text-muted-foreground">—</span>
-                      }
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Digitizing() {
-  const records = [
-    { doc: "Акт №2024-1234", type: "Акт выполненных работ", client: "ООО «Альфа Групп»", amount: "320 000 ₽", date: "22 апр 2026", status: "Обработан" },
-    { doc: "Сч-ф №2024-0891", type: "Счёт-фактура", client: "АО «Техносфера»", amount: "128 500 ₽", date: "21 апр 2026", status: "На проверке" },
-    { doc: "Д №2024-0445", type: "Договор поставки", client: "ООО «Магнит Трейд»", amount: "—", date: "20 апр 2026", status: "Обработан" },
-    { doc: "Акт №2024-1201", type: "Акт сверки", client: "ЗАО «СтройКом»", amount: "780 000 ₽", date: "19 апр 2026", status: "Ошибка" },
-    { doc: "Сч №2024-0788", type: "Счёт на оплату", client: "ООО «Прогресс»", amount: "95 000 ₽", date: "18 апр 2026", status: "Обработан" },
-    { doc: "Сч-ф №2024-0756", type: "Счёт-фактура", client: "ИП Петрова М.С.", amount: "43 200 ₽", date: "17 апр 2026", status: "На проверке" },
-  ];
-
-  const summary = [
-    { label: "Обработано", value: "1 228", icon: "FileCheck", color: "bg-green-500/10 text-green-400" },
-    { label: "На проверке", value: "8", icon: "Clock", color: "bg-orange-500/10 text-orange-400" },
-    { label: "Ошибок", value: "4", icon: "AlertCircle", color: "bg-red-500/10 text-red-400" },
-  ];
-
-  return (
-    <div>
-      <PageHeader
-        title="Оцифровка"
-        subtitle="Документооборот и обработка данных"
-        action={
-          <button className="flex items-center gap-2 bg-primary text-primary-foreground text-sm px-4 py-2 rounded hover:bg-primary/90 transition-colors">
-            <Icon name="Upload" size={14} />
-            Загрузить документы
-          </button>
-        }
-      />
-      <div className="p-8 space-y-6">
-        <div className="grid grid-cols-3 gap-4">
-          {summary.map((s) => (
-            <div key={s.label} className="stat-card flex items-center gap-4 animate-fade-in">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${s.color}`}>
-                <Icon name={s.icon} size={18} />
-              </div>
-              <div>
-                <div className="text-2xl font-semibold font-mono-nums text-foreground">{s.value}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">{s.label}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-
+      <div className="p-8">
         <div className="bg-card border border-border rounded-lg overflow-hidden">
-          <div className="px-5 py-3 border-b border-border flex items-center gap-3">
-            <div className="flex items-center gap-2 flex-1 bg-muted rounded px-3 py-1.5">
-              <Icon name="Search" size={13} className="text-muted-foreground" />
-              <input placeholder="Поиск по документам..." className="bg-transparent text-sm outline-none text-foreground placeholder:text-muted-foreground w-full" />
-            </div>
-            <button className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground px-3 py-1.5 border border-border rounded transition-colors">
-              <Icon name="Filter" size={13} />
-              Фильтр
-            </button>
-          </div>
           <table className="w-full data-table">
             <thead>
               <tr>
-                <th className="pl-5">Документ</th>
-                <th>Тип</th>
+                <th className="pl-5">№ Заявки</th>
                 <th>Клиент</th>
+                <th>Должность</th>
+                <th>Город</th>
+                <th>Рекрутер</th>
+                <th>Стадия</th>
                 <th>Сумма</th>
-                <th>Дата</th>
-                <th className="pr-5 text-right">Статус</th>
+                <th className="pr-5 text-right">Дата открытия</th>
               </tr>
             </thead>
             <tbody>
-              {records.map((r) => (
-                <tr key={r.doc} className="hover:bg-muted/40 transition-colors cursor-pointer">
-                  <td className="pl-5 text-foreground font-mono-nums text-xs font-medium">{r.doc}</td>
-                  <td className="text-muted-foreground text-sm">{r.type}</td>
-                  <td className="text-muted-foreground">{r.client}</td>
-                  <td className="font-mono-nums text-foreground">{r.amount}</td>
-                  <td className="text-muted-foreground font-mono-nums text-xs">{r.date}</td>
-                  <td className="pr-5 text-right"><StatusBadge status={r.status} /></td>
+              {DEALS_DATA.map((d) => (
+                <tr key={d.id} onClick={() => setSelected(d.id)} className="hover:bg-muted/40 transition-colors cursor-pointer">
+                  <td className="pl-5 font-mono-nums text-xs text-foreground font-medium">{d.number}</td>
+                  <td className="text-foreground">{d.brand}</td>
+                  <td className="text-foreground font-medium">{d.position}</td>
+                  <td className="text-muted-foreground">{d.city}</td>
+                  <td className="text-muted-foreground">{d.recruiter}</td>
+                  <td><span className={`badge-status ${stageColor[d.stage] ?? "bg-muted text-muted-foreground"}`}><span className="w-1.5 h-1.5 rounded-full bg-current" />{d.stage}</span></td>
+                  <td className="font-mono-nums text-foreground">{d.amount}</td>
+                  <td className="pr-5 text-right text-muted-foreground font-mono-nums text-xs">{d.openDate}</td>
                 </tr>
               ))}
             </tbody>
@@ -506,15 +542,323 @@ function Digitizing() {
   );
 }
 
+function DealCard({ deal, onBack }: { deal: typeof DEALS_DATA[0]; onBack: () => void }) {
+  return (
+    <div>
+      <div className="flex items-center gap-3 px-8 py-6 border-b border-border">
+        <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Icon name="ChevronLeft" size={16} />
+          Сделки
+        </button>
+        <span className="text-muted-foreground">/</span>
+        <h1 className="text-lg font-semibold text-foreground">{deal.number}</h1>
+        <span className="text-muted-foreground">·</span>
+        <span className="text-sm text-muted-foreground">{deal.position}</span>
+        <div className="ml-auto flex items-center gap-2">
+          <button className="flex items-center gap-2 bg-primary text-primary-foreground text-sm px-4 py-2 rounded hover:bg-primary/90 transition-colors">
+            <Icon name="Edit2" size={13} />
+            Редактировать
+          </button>
+        </div>
+      </div>
+
+      <div className="p-8 space-y-5 max-w-5xl">
+
+        {/* Основное */}
+        <SectionBlock title="Заявка — основные данные">
+          <div className="grid grid-cols-4 gap-4">
+            <Field label="Клиент (юр. лицо)" value={deal.client} />
+            <Field label="Бренд" value={deal.brand} />
+            <Field label="Должность" value={deal.position} />
+            <Field label="Город" value={deal.city} />
+            <Field label="Ответственный рекрутер" value={deal.recruiter} />
+            <Field label="Дата открытия" value={deal.openDate} />
+            <Field label="Стадия" value={deal.stage} />
+            <Field label="Сумма заявки" value={deal.amount} />
+          </div>
+        </SectionBlock>
+
+        {/* Счёт */}
+        <SectionBlock title="Счёт на оплату">
+          <table className="w-full">
+            <thead>
+              <tr className="text-xs text-muted-foreground uppercase tracking-wider">
+                <th className="text-left pb-3 font-medium">Услуга</th>
+                <th className="text-center pb-3 font-medium">Кол-во</th>
+                <th className="text-right pb-3 font-medium">Стоимость</th>
+                <th className="text-right pb-3 font-medium">Сумма</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-t border-border">
+                <td className="py-3 text-sm text-foreground">{deal.invoice.service}</td>
+                <td className="py-3 text-sm text-center font-mono-nums">{deal.invoice.qty}</td>
+                <td className="py-3 text-sm text-right font-mono-nums">{deal.invoice.price}</td>
+                <td className="py-3 text-sm text-right font-mono-nums font-semibold text-foreground">{deal.invoice.total}</td>
+              </tr>
+            </tbody>
+          </table>
+        </SectionBlock>
+
+        {/* Оплата */}
+        <SectionBlock title="Оплата от клиента">
+          <div className="space-y-3">
+            <div className="flex items-center gap-4 p-3 bg-muted/40 rounded-lg">
+              <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 ${deal.advance.paid ? "bg-primary border-primary" : "border-border"}`}>
+                {deal.advance.paid && <Icon name="Check" size={11} className="text-primary-foreground" />}
+              </div>
+              <div className="flex-1 text-sm font-medium text-foreground">Аванс</div>
+              <div className="font-mono-nums text-sm text-foreground">{deal.advance.amount}</div>
+              <div className="text-xs text-success font-medium">{deal.advance.paid ? `Оплачен ${deal.advance.date}` : "Ожидается"}</div>
+            </div>
+            {deal.extra.map((e) => (
+              <div key={e.label} className="flex items-center gap-4 p-3 bg-muted/40 rounded-lg">
+                <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 ${e.paid ? "bg-primary border-primary" : "border-border"}`}>
+                  {e.paid && <Icon name="Check" size={11} className="text-primary-foreground" />}
+                </div>
+                <div className="flex-1 text-sm font-medium text-foreground">{e.label}</div>
+                <div className="font-mono-nums text-sm text-foreground">{e.amount}</div>
+                <div className="text-xs text-muted-foreground">{e.paid ? `Оплачен ${e.date}` : "Ожидается"}</div>
+              </div>
+            ))}
+          </div>
+        </SectionBlock>
+
+        {/* Профиль должности */}
+        <SectionBlock title="Профиль должности">
+          <div className="space-y-5">
+            <div className="grid grid-cols-3 gap-4">
+              <Field label="ФИО ЛПР" value={deal.profile.lpr} />
+              <Field label="Искомая должность" value={deal.profile.targetPosition} />
+              <Field label="Дата открытия вакансии" value={deal.profile.openDate} />
+              <div className="col-span-3"><Field label="Причина открытия вакансии" value={deal.profile.reason} /></div>
+              <div className="col-span-3"><Field label="Описание структуры компании" value={deal.profile.structure} /></div>
+            </div>
+
+            <div>
+              <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wider font-medium">Обязанности и компетенции</div>
+              <div className="border border-border rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-muted/40">
+                      <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5 w-1/2">Обязанность</th>
+                      <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5 w-1/2">Компетенция</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deal.profile.duties.map((d, i) => (
+                      <tr key={i} className="border-t border-border">
+                        <td className="px-4 py-3 text-sm text-foreground">{d.duty}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{d.competence}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Мотивация на период испытательного срока" value={deal.profile.motivationProbation} />
+              <Field label="Мотивация основная" value={deal.profile.motivationMain} />
+              <Field label="Период стажировки" value={deal.profile.probationPeriod} />
+              <Field label="Оплата на время стажировки" value={deal.profile.probationPay} />
+              <div className="col-span-2"><Field label="Условия прохождения стажировки" value={deal.profile.probationConditions} /></div>
+              <div className="col-span-2"><Field label="Soft skills" value={deal.profile.softSkills} /></div>
+              <div className="col-span-2"><Field label="Дополнительные требования" value={deal.profile.additionalRequirements} /></div>
+              <Field label="Возраст" value={deal.profile.age} />
+              <Field label="Пол" value={deal.profile.gender} />
+              <Field label="Семейное положение" value={deal.profile.maritalStatus} />
+            </div>
+
+            <div>
+              <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wider font-medium">Где мог работать кандидат ранее</div>
+              <div className="border border-border rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-muted/40">
+                      <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Компания</th>
+                      <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Должность</th>
+                      <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Сфера</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deal.profile.previousWork.map((w, i) => (
+                      <tr key={i} className="border-t border-border">
+                        <td className="px-4 py-3 text-sm text-foreground">{w.company}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{w.position}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{w.field}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </SectionBlock>
+
+        {/* Акт */}
+        <SectionBlock title="Акт об оказании услуг">
+          <div className="grid grid-cols-4 gap-4 mb-4">
+            <Field label="Номер акта" value={deal.act.number} />
+            <Field label="Дата" value={deal.act.date} />
+            <Field label="ФИО вышедшего кандидата" value={deal.act.candidate} />
+            <Field label="Гарантийный период" value={deal.act.guarantee} />
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-lg">
+            <Icon name="Paperclip" size={15} className="text-muted-foreground" />
+            <span className="text-sm text-muted-foreground flex-1">Подписанный акт не прикреплён</span>
+            <button className="text-xs text-primary hover:underline">Прикрепить файл</button>
+          </div>
+        </SectionBlock>
+
+      </div>
+    </div>
+  );
+}
+
+// ── DIGITIZING ────────────────────────────────────────────────────────────────
+function Digitizing() {
+  const records = [
+    {
+      id: 1,
+      number: "ЗАЯ-2026-001",
+      position: "Бухгалтер",
+      city: "Москва",
+      amount: "120 000 ₽",
+      resourceCostPlan: "15 000 ₽",
+      resourceCostFact: "12 400 ₽",
+      recruiter: "Петрова О.В.",
+      stage: "Стажировка",
+      date: "10.04.2026",
+      stats: {
+        resumesViewed: 148,
+        callsHHFree: 34,
+        callsHHPaid: 12,
+        callsAvito: 8,
+        interviews: 9,
+        assessments: 6,
+        shows: 4,
+        internships: 2,
+      },
+    },
+  ];
+
+  const stageColor: Record<string, string> = {
+    "Поиск": "bg-blue-50 text-blue-600",
+    "Стажировка": "bg-orange-50 text-orange-600",
+    "Стоп": "bg-red-50 text-red-600",
+    "Гарантийный период": "bg-purple-50 text-purple-600",
+    "Закрыта": "bg-green-50 text-green-600",
+  };
+
+  const [expanded, setExpanded] = useState<number | null>(null);
+
+  return (
+    <div>
+      <PageHeader
+        title="Оцифровка"
+        subtitle="Отчёт по активностям рекрутинга"
+        action={
+          <button className="flex items-center gap-2 bg-primary text-primary-foreground text-sm px-4 py-2 rounded hover:bg-primary/90 transition-colors">
+            <Icon name="Plus" size={14} />
+            Новая запись
+          </button>
+        }
+      />
+      <div className="p-8 space-y-4">
+        {records.map((r) => (
+          <div key={r.id} className="bg-card border border-border rounded-lg overflow-hidden animate-fade-in">
+            <div
+              className="px-5 py-4 flex items-center gap-4 cursor-pointer hover:bg-muted/30 transition-colors"
+              onClick={() => setExpanded(expanded === r.id ? null : r.id)}
+            >
+              <Icon name={expanded === r.id ? "ChevronDown" : "ChevronRight"} size={15} className="text-muted-foreground shrink-0" />
+              <span className="font-mono-nums text-xs text-muted-foreground w-28 shrink-0">{r.number}</span>
+              <span className="font-medium text-foreground flex-1">{r.position}</span>
+              <span className="text-sm text-muted-foreground w-24">{r.city}</span>
+              <span className="font-mono-nums text-sm text-foreground w-28">{r.amount}</span>
+              <span className="text-sm text-muted-foreground w-32">{r.recruiter}</span>
+              <span className={`badge-status ${stageColor[r.stage] ?? "bg-muted text-muted-foreground"} w-32 justify-center`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-current" />{r.stage}
+              </span>
+              <span className="font-mono-nums text-xs text-muted-foreground w-24 text-right">{r.date}</span>
+            </div>
+
+            {expanded === r.id && (
+              <div className="border-t border-border p-5 space-y-5">
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="bg-muted/40 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-semibold font-mono-nums text-foreground">{r.stats.resumesViewed}</div>
+                    <div className="text-xs text-muted-foreground mt-1">Просмотрено резюме</div>
+                  </div>
+                  <div className="bg-muted/40 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-semibold font-mono-nums text-foreground">{r.stats.callsHHFree + r.stats.callsHHPaid + r.stats.callsAvito}</div>
+                    <div className="text-xs text-muted-foreground mt-1">Всего звонков</div>
+                  </div>
+                  <div className="bg-muted/40 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-semibold font-mono-nums text-foreground">{r.stats.interviews}</div>
+                    <div className="text-xs text-muted-foreground mt-1">Собеседований</div>
+                  </div>
+                  <div className="bg-muted/40 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-semibold font-mono-nums text-foreground">{r.stats.internships}</div>
+                    <div className="text-xs text-muted-foreground mt-1">Стажировок</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-5">
+                  <div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-3">Детализация активностей</div>
+                    <div className="space-y-2">
+                      {[
+                        { label: "Звонки HH.ru (бесплатно)", value: r.stats.callsHHFree },
+                        { label: "Звонки HH.ru (платно)", value: r.stats.callsHHPaid },
+                        { label: "Звонки Авито (платно)", value: r.stats.callsAvito },
+                        { label: "Направленных оценок", value: r.stats.assessments },
+                        { label: "Показов кандидатов", value: r.stats.shows },
+                      ].map((item) => (
+                        <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                          <span className="text-sm text-muted-foreground">{item.label}</span>
+                          <span className="font-mono-nums text-sm font-medium text-foreground">{item.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-3">Бюджет на подбор</div>
+                    <div className="space-y-2">
+                      {[
+                        { label: "Стоимость заявки", value: r.amount },
+                        { label: "Бюджет на ресурсы (план)", value: r.resourceCostPlan },
+                        { label: "Бюджет на ресурсы (факт)", value: r.resourceCostFact },
+                        { label: "Остаток бюджета", value: `${(parseInt(r.resourceCostPlan) - parseInt(r.resourceCostFact)).toLocaleString()} ₽` },
+                      ].map((item) => (
+                        <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                          <span className="text-sm text-muted-foreground">{item.label}</span>
+                          <span className="font-mono-nums text-sm font-medium text-foreground">{item.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    "Активный": "bg-green-500/10 text-green-400",
-    "Обработан": "bg-green-500/10 text-green-400",
-    "Новый": "bg-blue-500/10 text-blue-400",
-    "В работе": "bg-blue-500/10 text-blue-400",
-    "На проверке": "bg-orange-500/10 text-orange-400",
+    "Активный": "bg-green-50 text-green-700",
+    "Обработан": "bg-green-50 text-green-700",
+    "Новый": "bg-blue-50 text-blue-700",
+    "В работе": "bg-blue-50 text-blue-700",
+    "На проверке": "bg-orange-50 text-orange-700",
     "Пауза": "bg-muted text-muted-foreground",
-    "Ошибка": "bg-red-500/10 text-red-400",
+    "Ошибка": "bg-red-50 text-red-700",
   };
   return (
     <span className={`badge-status ${map[status] ?? "bg-muted text-muted-foreground"}`}>
@@ -526,8 +870,8 @@ function StatusBadge({ status }: { status: string }) {
 
 function PriorityBadge({ priority }: { priority: string }) {
   const map: Record<string, string> = {
-    "Высокий": "text-red-400",
-    "Средний": "text-orange-400",
+    "Высокий": "text-red-500",
+    "Средний": "text-orange-500",
     "Низкий": "text-muted-foreground",
   };
   return <span className={`text-xs ${map[priority] ?? ""}`}>{priority}</span>;
