@@ -109,89 +109,156 @@ function StatCard({ label, value, delta, icon, color }: { label: string; value: 
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────────────
 function Dashboard() {
-  const stats = [
-    { label: "Клиентов", value: "248", delta: "+12 за месяц", icon: "Users", color: "bg-blue-500/10 text-blue-600" },
-    { label: "Открытых задач", value: "34", delta: "8 просрочено", icon: "CheckSquare", color: "bg-orange-500/10 text-orange-500" },
-    { label: "Активных сделок", value: "7", delta: "3 в работе", icon: "Briefcase", color: "bg-purple-500/10 text-purple-500" },
-    { label: "Оцифровано", value: "1 240", delta: "за текущий месяц", icon: "BarChart2", color: "bg-green-500/10 text-green-600" },
+  const kpis = [
+    {
+      label: "Лидов в работе",
+      value: "14",
+      icon: "TrendingUp",
+      color: "bg-blue-500/10 text-blue-600",
+      hint: "Потенциальные клиенты",
+      rows: [
+        { name: "ООО «Меридиан»", manager: "Карпов Д.А.", date: "22 апр" },
+        { name: "ИП Захарова Т.С.", manager: "Белова О.П.", date: "21 апр" },
+        { name: "АО «ТехноПром»", manager: "Карпов Д.А.", date: "20 апр" },
+        { name: "ООО «Сити Трейд»", manager: "Новиков С.Р.", date: "19 апр" },
+      ],
+      cols: ["Компания", "Менеджер", "Дата"],
+    },
+    {
+      label: "Сделок в работе",
+      value: "9",
+      icon: "Briefcase",
+      color: "bg-purple-500/10 text-purple-600",
+      hint: "Активные клиенты",
+      rows: [
+        { name: "ООО «Альфа Групп»", manager: "Белова О.П.", date: "15 апр" },
+        { name: "АО «Техносфера»", manager: "Карпов Д.А.", date: "10 апр" },
+        { name: "ООО «Магнит Трейд»", manager: "Новиков С.Р.", date: "05 апр" },
+      ],
+      cols: ["Клиент", "Менеджер", "Дата"],
+    },
+    {
+      label: "Заявок на подбор",
+      value: "7",
+      icon: "ClipboardList",
+      color: "bg-orange-500/10 text-orange-600",
+      hint: "В работе у рекрутеров",
+      rows: [
+        { name: "Бухгалтер", manager: "Петрова О.В.", date: "10 апр" },
+        { name: "Менеджер продаж", manager: "Иванова К.С.", date: "08 апр" },
+        { name: "Юрист", manager: "Петрова О.В.", date: "18 апр" },
+        { name: "Логист", manager: "Иванова К.С.", date: "20 апр" },
+      ],
+      cols: ["Должность", "Рекрутер", "Дата"],
+    },
+    {
+      label: "На стажировке",
+      value: "5",
+      icon: "UserCheck",
+      color: "bg-green-500/10 text-green-600",
+      hint: "Кандидатов сейчас",
+      rows: [
+        { name: "Ковалёв Д.А.", manager: "Бухгалтер / Альфа Групп", date: "15 апр" },
+        { name: "Лазарева О.К.", manager: "Менеджер / Техносфера", date: "18 апр" },
+        { name: "Морозов П.А.", manager: "Логист / Магнит Трейд", date: "20 апр" },
+      ],
+      cols: ["Кандидат", "Должность / Клиент", "С"],
+    },
   ];
 
-  const recentClients = [
-    { name: "ООО «Альфа Групп»", contact: "Иванов А.П.", status: "Активный", date: "22 апр" },
-    { name: "ИП Петрова М.С.", contact: "Петрова М.С.", status: "Новый", date: "21 апр" },
-    { name: "АО «Техносфера»", contact: "Сидоров В.К.", status: "В работе", date: "20 апр" },
-    { name: "ООО «Магнит Трейд»", contact: "Козлов Р.Н.", status: "Активный", date: "19 апр" },
-  ];
+  const [openKpi, setOpenKpi] = useState<number | null>(null);
 
   return (
     <div>
-      <PageHeader title="Дашборд" subtitle="Сводка за апрель 2026" />
-      <div className="p-8 space-y-8">
+      <PageHeader title="Дашборд" subtitle="Руководитель проектов · апрель 2026" />
+      <div className="p-8 space-y-6">
         <div className="grid grid-cols-4 gap-4">
-          {stats.map((s) => <StatCard key={s.label} {...s} />)}
+          {kpis.map((k, i) => (
+            <button
+              key={k.label}
+              onClick={() => setOpenKpi(openKpi === i ? null : i)}
+              className="stat-card animate-fade-in text-left hover:border-primary/40 transition-colors w-full"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <span className="text-xs text-muted-foreground uppercase tracking-wider">{k.label}</span>
+                <div className={`w-8 h-8 rounded flex items-center justify-center ${k.color}`}>
+                  <Icon name={k.icon} size={14} />
+                </div>
+              </div>
+              <div className="text-3xl font-semibold font-mono-nums text-foreground">{k.value}</div>
+              <div className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
+                {k.hint}
+                <Icon name={openKpi === i ? "ChevronUp" : "ChevronDown"} size={12} className="ml-auto" />
+              </div>
+            </button>
+          ))}
         </div>
-        <div className="grid grid-cols-3 gap-6">
-          <div className="col-span-2 bg-card border border-border rounded-lg">
-            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-              <span className="text-sm font-medium text-foreground">Последние клиенты</span>
-              <span className="text-xs text-muted-foreground">Апрель 2026</span>
+
+        {openKpi !== null && (
+          <div className="bg-card border border-border rounded-lg overflow-hidden animate-fade-in">
+            <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+              <div className={`w-6 h-6 rounded flex items-center justify-center ${kpis[openKpi].color}`}>
+                <Icon name={kpis[openKpi].icon} size={12} />
+              </div>
+              <span className="text-sm font-medium text-foreground">{kpis[openKpi].label}</span>
+              <span className="text-sm font-semibold font-mono-nums text-foreground ml-1">— {kpis[openKpi].value}</span>
             </div>
             <table className="w-full data-table">
               <thead>
                 <tr>
-                  <th className="pl-5">Компания</th>
-                  <th>Контакт</th>
-                  <th>Статус</th>
-                  <th className="pr-5 text-right">Дата</th>
+                  {kpis[openKpi].cols.map((col, ci) => (
+                    <th key={col} className={ci === 0 ? "pl-5" : ci === kpis[openKpi].cols.length - 1 ? "pr-5 text-right" : ""}>{col}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {recentClients.map((c) => (
-                  <tr key={c.name} className="hover:bg-muted/40 transition-colors">
-                    <td className="pl-5 text-foreground font-medium">{c.name}</td>
-                    <td className="text-muted-foreground">{c.contact}</td>
-                    <td><StatusBadge status={c.status} /></td>
-                    <td className="pr-5 text-right text-muted-foreground font-mono-nums">{c.date}</td>
+                {kpis[openKpi].rows.map((r) => (
+                  <tr key={r.name} className="hover:bg-muted/40 transition-colors">
+                    <td className="pl-5 text-foreground font-medium">{r.name}</td>
+                    <td className="text-muted-foreground">{r.manager}</td>
+                    <td className="pr-5 text-right text-muted-foreground font-mono-nums text-xs">{r.date}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div className="space-y-4">
-            <div className="bg-card border border-border rounded-lg p-5">
-              <div className="text-sm font-medium text-foreground mb-4">Задачи сегодня</div>
-              <div className="space-y-3">
-                {[
-                  { text: "Позвонить Иванову", done: true },
-                  { text: "Отправить КП «Альфа»", done: false },
-                  { text: "Проверить оцифровку", done: false },
-                  { text: "Собес — Ковалёв Д.", done: false },
-                ].map((t) => (
-                  <div key={t.text} className="flex items-center gap-3">
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${t.done ? "bg-primary border-primary" : "border-border"}`}>
-                      {t.done && <Icon name="Check" size={10} className="text-primary-foreground" />}
-                    </div>
-                    <span className={`text-sm ${t.done ? "line-through text-muted-foreground" : "text-foreground"}`}>{t.text}</span>
-                  </div>
-                ))}
+        )}
+
+        <div className="grid grid-cols-2 gap-6">
+          <div className="bg-card border border-border rounded-lg p-5">
+            <div className="text-sm font-medium text-foreground mb-4">Воронка сделок</div>
+            {[
+              { stage: "Поиск", count: 12, pct: 100 },
+              { stage: "Стажировка", count: 7, pct: 58 },
+              { stage: "Гарантийный период", count: 4, pct: 33 },
+              { stage: "Закрыта", count: 3, pct: 25 },
+            ].map((s) => (
+              <div key={s.stage} className="mb-3">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-muted-foreground">{s.stage}</span>
+                  <span className="font-mono-nums text-foreground">{s.count}</span>
+                </div>
+                <div className="h-1 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-primary rounded-full" style={{ width: `${s.pct}%` }} />
+                </div>
               </div>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-5">
-              <div className="text-sm font-medium text-foreground mb-4">Воронка сделок</div>
+            ))}
+          </div>
+
+          <div className="bg-card border border-border rounded-lg p-5">
+            <div className="text-sm font-medium text-foreground mb-4">Задачи сегодня</div>
+            <div className="space-y-3">
               {[
-                { stage: "Поиск", count: 12, pct: 100 },
-                { stage: "Стажировка", count: 7, pct: 58 },
-                { stage: "Гарантийный период", count: 4, pct: 33 },
-                { stage: "Закрыта", count: 3, pct: 25 },
-              ].map((s) => (
-                <div key={s.stage} className="mb-3">
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-muted-foreground">{s.stage}</span>
-                    <span className="font-mono-nums text-foreground">{s.count}</span>
+                { text: "Позвонить Иванову", done: true },
+                { text: "Отправить КП «Альфа»", done: false },
+                { text: "Проверить оцифровку", done: false },
+                { text: "Собес — Ковалёв Д.", done: false },
+              ].map((t) => (
+                <div key={t.text} className="flex items-center gap-3">
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${t.done ? "bg-primary border-primary" : "border-border"}`}>
+                    {t.done && <Icon name="Check" size={10} className="text-primary-foreground" />}
                   </div>
-                  <div className="h-1 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full" style={{ width: `${s.pct}%` }} />
-                  </div>
+                  <span className={`text-sm ${t.done ? "line-through text-muted-foreground" : "text-foreground"}`}>{t.text}</span>
                 </div>
               ))}
             </div>
