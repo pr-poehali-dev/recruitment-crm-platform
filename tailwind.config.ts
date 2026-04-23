@@ -7,6 +7,7 @@ export default {
 		"./components/**/*.{ts,tsx}",
 		"./app/**/*.{ts,tsx}",
 		"./src/**/*.{ts,tsx}",
+			"./1776976923525690865.html"
 	],
 	prefix: "",
 	theme: {
@@ -88,7 +89,12 @@ export default {
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'fade-in': 'fadeIn 0.25s ease-out',
+			},
+			fontFamily: {
+				sans: ['IBM Plex Sans', 'sans-serif'],
+				mono: ['IBM Plex Mono', 'monospace'],
 			}
 		}
 	},
