@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "GET список заявок оцифровки",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": [{"id": 3, "position": "Юрист"}],
+      "bodyMatcher": "contains"
+    }
+  ]
+}
