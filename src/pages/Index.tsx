@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 
-type Section = "dashboard" | "clients" | "tasks" | "deals" | "digitizing";
+type Section = "dashboard" | "clients" | "tasks" | "deals" | "digitizing" | "database";
 
 const NAV = [
   { id: "dashboard", label: "Дашборд", icon: "LayoutDashboard" },
@@ -9,6 +9,7 @@ const NAV = [
   { id: "tasks", label: "Задачи", icon: "CheckSquare" },
   { id: "deals", label: "Сделки", icon: "Briefcase" },
   { id: "digitizing", label: "Оцифровка", icon: "BarChart2" },
+  { id: "database", label: "База данных", icon: "Database" },
 ] as const;
 
 export default function Index() {
@@ -23,6 +24,7 @@ export default function Index() {
         {active === "tasks" && <Tasks />}
         {active === "deals" && <Deals />}
         {active === "digitizing" && <Digitizing />}
+        {active === "database" && <Database />}
       </main>
     </div>
   );
@@ -1266,6 +1268,224 @@ function Digitizing() {
       </div>
 
       {/* Карточка заявки (drawer) */}
+      {selectedId && (
+        detailLoading
+          ? (
+            <div className="fixed inset-0 z-50 flex">
+              <div className="absolute inset-0 bg-black/30" onClick={() => setSelectedId(null)} />
+              <div className="relative ml-auto w-full max-w-3xl bg-background flex items-center justify-center">
+                <Icon name="Loader" size={24} className="animate-spin text-muted-foreground" />
+              </div>
+            </div>
+          )
+          : detail && <DigitizingCard order={detail} onClose={() => { setSelectedId(null); setDetail(null); }} />
+      )}
+    </div>
+  );
+}
+
+// ── DATABASE ──────────────────────────────────────────────────────────────────
+const PAYMENT_ROWS = [
+  { label: "Продажи", sublabel: "Рук. проекта / продажи", pct: "pct_sales" as const, status: "payment_sales_status" as const, date: "payment_sales_date" as const },
+  { label: "Профиль / аванс", sublabel: "Рук. проекта / профиль", pct: "pct_profile" as const, status: "payment_profile_status" as const, date: "payment_profile_date" as const },
+  { label: "Рекрутинг", sublabel: "Ответств. за рекрутинг", pct: "pct_recruiting" as const, status: "payment_recruiting_status" as const, date: "payment_recruiting_date" as const },
+  { label: "Управление", sublabel: "Рук. проекта / закрытие", pct: "pct_management" as const, status: "payment_management_status" as const, date: "payment_management_date" as const },
+  { label: "Рук. группы", sublabel: "Рук. группы подбора", pct: "pct_group_head" as const, status: "payment_group_head_status" as const, date: "payment_group_head_date" as const },
+];
+
+function DbRow({ order, onOpen }: { order: DigOrder; onOpen: () => void }) {
+  const base = parseFloat(order.amount) - parseFloat(order.resource_plan);
+  const resourceLeft = parseFloat(order.resource_plan) - parseFloat(order.resource_fact);
+
+  return (
+    <div className="bg-card border border-border rounded-xl overflow-hidden animate-fade-in">
+      {/* Шапка карточки */}
+      <div
+        className="px-5 py-4 flex items-start justify-between gap-4 cursor-pointer hover:bg-muted/20 transition-colors"
+        onClick={onOpen}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-mono-nums text-xs text-muted-foreground">{order.number}</span>
+            <span className={`badge-status ${STAGE_COLOR[order.stage] ?? "bg-muted text-muted-foreground"}`}>
+              <span className="w-1.5 h-1.5 rounded-full bg-current" />{order.stage}
+            </span>
+          </div>
+          <div className="font-semibold text-foreground">{order.position}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">{order.client_legal}{order.brand ? ` · ${order.brand}` : ""} · {order.city}</div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="font-semibold font-mono-nums text-foreground">{fmt(order.amount)}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">Рекрутер: {order.recruiter}</div>
+        </div>
+      </div>
+
+      {/* Даты оплат */}
+      <div className="px-5 pb-4 flex flex-wrap gap-3">
+        <div className="bg-muted/40 rounded-lg px-3 py-2 text-xs">
+          <span className="text-muted-foreground">Аванс: </span>
+          <span className="font-mono-nums font-medium">{order.date_advance ?? "—"}</span>
+        </div>
+        {order.date_extra_payment_1 && (
+          <div className="bg-muted/40 rounded-lg px-3 py-2 text-xs">
+            <span className="text-muted-foreground">Доплата 1: </span>
+            <span className="font-mono-nums font-medium">{order.date_extra_payment_1}</span>
+          </div>
+        )}
+        {order.date_extra_payment_2 && (
+          <div className="bg-muted/40 rounded-lg px-3 py-2 text-xs">
+            <span className="text-muted-foreground">Доплата 2: </span>
+            <span className="font-mono-nums font-medium">{order.date_extra_payment_2}</span>
+          </div>
+        )}
+        {order.date_extra_payment_3 && (
+          <div className="bg-muted/40 rounded-lg px-3 py-2 text-xs">
+            <span className="text-muted-foreground">Доплата 3: </span>
+            <span className="font-mono-nums font-medium">{order.date_extra_payment_3}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Бюджет + активности */}
+      <div className="border-t border-border grid grid-cols-5 divide-x divide-border">
+        <div className="px-4 py-3 text-center">
+          <div className="text-xs text-muted-foreground mb-1">Бюджет план</div>
+          <div className="font-mono-nums text-sm font-medium">{fmt(order.resource_plan)}</div>
+        </div>
+        <div className="px-4 py-3 text-center">
+          <div className="text-xs text-muted-foreground mb-1">Бюджет факт</div>
+          <div className="font-mono-nums text-sm font-medium">{fmt(order.resource_fact)}</div>
+        </div>
+        <div className="px-4 py-3 text-center">
+          <div className="text-xs text-muted-foreground mb-1">Остаток / долг</div>
+          <div className={`font-mono-nums text-sm font-semibold ${resourceLeft >= 0 ? "text-green-600" : "text-red-500"}`}>{fmt(resourceLeft)}</div>
+        </div>
+        <div className="px-4 py-3 text-center">
+          <div className="text-xs text-muted-foreground mb-1">Просмотрено</div>
+          <div className="font-mono-nums text-sm font-medium">{order.resumes_viewed}</div>
+        </div>
+        <div className="px-4 py-3 text-center">
+          <div className="text-xs text-muted-foreground mb-1">Срок закрытия</div>
+          <div className="font-mono-nums text-sm font-medium">{order.date_closed ?? "—"}</div>
+        </div>
+      </div>
+
+      {/* Акт */}
+      {order.act_number && (
+        <div className="border-t border-border px-5 py-3 flex flex-wrap gap-4 bg-muted/10">
+          <div className="text-xs"><span className="text-muted-foreground">Акт: </span><span className="font-medium">{order.act_number}</span></div>
+          <div className="text-xs"><span className="text-muted-foreground">Дата: </span><span className="font-mono-nums">{order.act_date}</span></div>
+          <div className="text-xs"><span className="text-muted-foreground">Сумма: </span><span className="font-mono-nums font-medium">{fmt(order.act_amount)}</span></div>
+          <div className="text-xs"><span className="text-muted-foreground">Кандидат: </span><span className="font-medium">{order.act_candidate}</span></div>
+          <div className="text-xs"><span className="text-muted-foreground">Гарантия: </span><span>{order.guarantee_period}</span></div>
+        </div>
+      )}
+
+      {/* ЗП за исполнение */}
+      <div className="border-t border-border">
+        <div className="px-5 py-2 bg-muted/30 text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center justify-between">
+          <span>Оплата за исполнение <span className="text-foreground normal-case font-normal">(база: {fmt(base)})</span></span>
+        </div>
+        <div className="divide-y divide-border">
+          {PAYMENT_ROWS.map((row) => {
+            const pct = parseFloat(order[row.pct] as string);
+            const sum = (base * pct) / 100;
+            const status = order[row.status] as string;
+            const date = order[row.date] as string | null;
+            return (
+              <div key={row.label} className="px-5 py-2.5 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-foreground">{row.label} <span className="text-muted-foreground text-xs">({pct}%)</span></div>
+                  <div className="text-xs text-muted-foreground">{row.sublabel}</div>
+                </div>
+                <div className="font-mono-nums text-sm font-semibold w-28 text-right">{fmt(sum)}</div>
+                <div className="w-28 flex justify-center">
+                  <span className={`badge-status ${PAYMENT_STATUS_COLOR[status] ?? "bg-muted text-muted-foreground"}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-current" />{status}
+                  </span>
+                </div>
+                <div className="font-mono-nums text-xs text-muted-foreground w-24 text-right">{date ?? "—"}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Итог активностей */}
+      <div className="border-t border-border grid grid-cols-6 divide-x divide-border bg-muted/10">
+        {[
+          { label: "Звонков", value: (order.calls_hh_free ?? 0) + (order.calls_hh_paid ?? 0) + (order.calls_avito ?? 0) },
+          { label: "Направлено", value: order.assessments },
+          { label: "Дошло", value: order.shows },
+          { label: "Собес.", value: order.interviews },
+          { label: "Стажёров", value: order.internships },
+          { label: "HH / Авито", value: `${(order.calls_hh_free ?? 0) + (order.calls_hh_paid ?? 0)} / ${order.calls_avito ?? 0}` },
+        ].map(item => (
+          <div key={item.label} className="px-3 py-2.5 text-center">
+            <div className="text-xs text-muted-foreground mb-0.5">{item.label}</div>
+            <div className="font-mono-nums text-sm font-medium">{item.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Database() {
+  const [orders, setOrders] = useState<DigOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [detail, setDetail] = useState<DigDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  useEffect(() => {
+    fetch(DIGITIZING_URL)
+      .then(r => r.json())
+      .then(data => { setOrders(data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  async function openCard(id: number) {
+    setSelectedId(id);
+    setDetailLoading(true);
+    try {
+      const res = await fetch(`${DIGITIZING_URL}?id=${id}`);
+      const data = await res.json();
+      setDetail(data);
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  const totalPayroll = orders.reduce((sum, o) => {
+    const base = parseFloat(o.amount) - parseFloat(o.resource_plan);
+    return sum + PAYMENT_ROWS.reduce((s, row) => s + (base * parseFloat(o[row.pct] as string)) / 100, 0);
+  }, 0);
+
+  return (
+    <div>
+      <PageHeader
+        title="База данных"
+        subtitle={loading ? "Загрузка…" : `${orders.length} заявок · ФОТ: ${fmt(totalPayroll)}`}
+        action={
+          <button className="flex items-center gap-2 bg-primary text-primary-foreground text-sm px-4 py-2 rounded hover:bg-primary/90 transition-colors">
+            <Icon name="Download" size={14} />
+            Экспорт
+          </button>
+        }
+      />
+      <div className="p-8 space-y-4">
+        {loading ? (
+          <div className="flex items-center justify-center py-20 text-muted-foreground">
+            <Icon name="Loader" size={20} className="animate-spin mr-2" />Загрузка данных…
+          </div>
+        ) : (
+          orders.map(order => (
+            <DbRow key={order.id} order={order} onOpen={() => openCard(order.id)} />
+          ))
+        )}
+      </div>
+
       {selectedId && (
         detailLoading
           ? (
