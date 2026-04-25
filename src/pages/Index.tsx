@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 
-type Section = "dashboard" | "clients" | "tasks" | "deals" | "digitizing" | "database";
+type Section = "dashboard" | "clients" | "tasks" | "deals" | "digitizing" | "database" | "leads" | "reports";
 
 const NAV = [
   { id: "dashboard", label: "Дашборд", icon: "LayoutDashboard" },
+  { id: "leads", label: "Лиды", icon: "Zap" },
   { id: "clients", label: "Клиенты", icon: "Users" },
   { id: "tasks", label: "Задачи", icon: "CheckSquare" },
   { id: "deals", label: "Сделки", icon: "Briefcase" },
   { id: "digitizing", label: "Оцифровка", icon: "BarChart2" },
   { id: "database", label: "База данных", icon: "Database" },
+  { id: "reports", label: "Отчёты", icon: "PieChart" },
 ] as const;
 
 export default function Index() {
@@ -25,6 +27,8 @@ export default function Index() {
         {active === "deals" && <Deals />}
         {active === "digitizing" && <Digitizing />}
         {active === "database" && <Database />}
+        {active === "leads" && <Leads />}
+        {active === "reports" && <Reports />}
       </main>
     </div>
   );
@@ -1498,6 +1502,432 @@ function Database() {
           )
           : detail && <DigitizingCard order={detail} onClose={() => { setSelectedId(null); setDetail(null); }} />
       )}
+    </div>
+  );
+}
+
+// ── LEADS ─────────────────────────────────────────────────────────────────────
+const LEADS_URL = "https://functions.poehali.dev/44ca6591-a746-4f6a-948f-beb2bde38d0f";
+
+const LEAD_SOURCES = ["Яндекс Директ", "2ГИС", "Входящий звонок", "Рекомендация", "Старая база", "Другое"];
+const LEAD_STAGES = ["Лид", "Переговоры", "Договор", "Ожидание оплаты"];
+
+const LEAD_STAGE_COLOR: Record<string, string> = {
+  "Лид": "bg-blue-50 text-blue-600",
+  "Переговоры": "bg-yellow-50 text-yellow-700",
+  "Договор": "bg-orange-50 text-orange-600",
+  "Ожидание оплаты": "bg-purple-50 text-purple-600",
+};
+
+type Lead = {
+  id: number;
+  company: string;
+  contact_name: string;
+  contact_phone: string;
+  contact_email: string | null;
+  position: string | null;
+  source: string;
+  source_custom: string | null;
+  stage: string;
+  manager_id: number | null;
+  manager_name: string;
+  manager_display: string;
+  comment: string | null;
+  deal_id: number | null;
+  created_at: string;
+};
+
+type PUser = { id: number; name: string; role: string };
+
+function LeadForm({ users, onSave, onClose }: { users: PUser[]; onSave: (lead: Lead) => void; onClose: () => void }) {
+  const [form, setForm] = useState({
+    company: "", contact_name: "", contact_phone: "", contact_email: "",
+    position: "", source: "Яндекс Директ", source_custom: "", stage: "Лид",
+    manager_id: "", comment: "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    const manager = users.find(u => String(u.id) === form.manager_id);
+    const res = await fetch(LEADS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "create", ...form, manager_name: manager?.name ?? "" }),
+    });
+    const data = await res.json();
+    onSave({ ...form, id: data.id, manager_display: manager?.name ?? "", created_at: new Date().toISOString(), deal_id: null, manager_id: Number(form.manager_id) || null } as Lead);
+    setSaving(false);
+  }
+
+  const inp = "w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary";
+  const lbl = "block text-xs text-muted-foreground mb-1";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative bg-background rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="font-semibold text-foreground text-lg">Новый лид</div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><Icon name="X" size={18} /></button>
+        </div>
+        <form onSubmit={submit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className={lbl}>Компания *</label>
+              <input className={inp} required value={form.company} onChange={e => set("company", e.target.value)} placeholder="ООО «Название»" />
+            </div>
+            <div>
+              <label className={lbl}>Контактное лицо</label>
+              <input className={inp} value={form.contact_name} onChange={e => set("contact_name", e.target.value)} placeholder="ФИО" />
+            </div>
+            <div>
+              <label className={lbl}>Телефон</label>
+              <input className={inp} value={form.contact_phone} onChange={e => set("contact_phone", e.target.value)} placeholder="+7 900 000-00-00" />
+            </div>
+            <div>
+              <label className={lbl}>Email</label>
+              <input className={inp} type="email" value={form.contact_email} onChange={e => set("contact_email", e.target.value)} placeholder="email@company.ru" />
+            </div>
+            <div>
+              <label className={lbl}>Позиция на подбор</label>
+              <input className={inp} value={form.position} onChange={e => set("position", e.target.value)} placeholder="Бухгалтер, менеджер…" />
+            </div>
+            <div>
+              <label className={lbl}>Источник *</label>
+              <select className={inp} value={form.source} onChange={e => set("source", e.target.value)}>
+                {LEAD_SOURCES.map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+            {form.source === "Другое" && (
+              <div>
+                <label className={lbl}>Укажите источник</label>
+                <input className={inp} value={form.source_custom} onChange={e => set("source_custom", e.target.value)} placeholder="Источник" />
+              </div>
+            )}
+            <div>
+              <label className={lbl}>Стадия</label>
+              <select className={inp} value={form.stage} onChange={e => set("stage", e.target.value)}>
+                {LEAD_STAGES.map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className={form.source === "Другое" ? "" : "col-span-2"}>
+              <label className={lbl}>Руководитель проекта *</label>
+              <select className={inp} required value={form.manager_id} onChange={e => set("manager_id", e.target.value)}>
+                <option value="">— выберите —</option>
+                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className={lbl}>Комментарий</label>
+              <textarea className={`${inp} resize-none`} rows={2} value={form.comment} onChange={e => set("comment", e.target.value)} placeholder="Заметки по лиду…" />
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="submit" disabled={saving} className="flex-1 bg-primary text-primary-foreground text-sm py-2 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50">
+              {saving ? "Сохраняю…" : "Создать лид"}
+            </button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted/50 transition-colors">Отмена</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function Leads() {
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [users, setUsers] = useState<PUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [stageFilter, setStageFilter] = useState("");
+  const [managerFilter, setManagerFilter] = useState("");
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      fetch(LEADS_URL).then(r => r.json()),
+      fetch(`${LEADS_URL}?action=users`).then(r => r.json()),
+    ]).then(([l, u]) => { setLeads(l); setUsers(u); setLoading(false); });
+  }, []);
+
+  async function changeStage(id: number, stage: string) {
+    setUpdatingId(id);
+    await fetch(LEADS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "update_stage", id, stage }),
+    });
+    setLeads(ls => ls.map(l => l.id === id ? { ...l, stage } : l));
+    setUpdatingId(null);
+  }
+
+  const filtered = leads.filter(l =>
+    (!stageFilter || l.stage === stageFilter) &&
+    (!managerFilter || String(l.manager_id) === managerFilter)
+  );
+
+  const stageCounts = LEAD_STAGES.reduce((acc, s) => ({ ...acc, [s]: leads.filter(l => l.stage === s).length }), {} as Record<string, number>);
+
+  return (
+    <div>
+      <PageHeader
+        title="Лиды"
+        subtitle={loading ? "Загрузка…" : `${leads.length} лидов`}
+        action={
+          <button onClick={() => setShowForm(true)} className="flex items-center gap-2 bg-primary text-primary-foreground text-sm px-4 py-2 rounded hover:bg-primary/90 transition-colors">
+            <Icon name="Plus" size={14} />Новый лид
+          </button>
+        }
+      />
+
+      <div className="px-8 pb-4">
+        {/* Воронка-счётчики */}
+        <div className="grid grid-cols-4 gap-3 mb-5">
+          {LEAD_STAGES.map((s, i) => (
+            <div
+              key={s}
+              onClick={() => setStageFilter(stageFilter === s ? "" : s)}
+              className={`rounded-xl border-2 px-4 py-3 cursor-pointer transition-all ${stageFilter === s ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/40"}`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-muted-foreground font-medium">{s}</span>
+                <span className="text-xs text-muted-foreground">шаг {i + 1}</span>
+              </div>
+              <div className="text-2xl font-semibold font-mono-nums text-foreground">{stageCounts[s] ?? 0}</div>
+              {i > 0 && leads.length > 0 && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  {Math.round(((stageCounts[s] ?? 0) / leads.length) * 100)}% от всех
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Фильтры */}
+        <div className="flex gap-3 mb-4">
+          <select
+            className="border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none"
+            value={managerFilter}
+            onChange={e => setManagerFilter(e.target.value)}
+          >
+            <option value="">Все руководители</option>
+            {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+          {stageFilter && (
+            <button onClick={() => setStageFilter("")} className="flex items-center gap-1 text-sm text-muted-foreground border border-border rounded-lg px-3 py-2 hover:bg-muted/50">
+              <Icon name="X" size={13} />{stageFilter}
+            </button>
+          )}
+          {(stageFilter || managerFilter) && (
+            <button onClick={() => { setStageFilter(""); setManagerFilter(""); }} className="text-sm text-primary hover:underline px-2">
+              Сбросить
+            </button>
+          )}
+        </div>
+
+        {/* Список лидов */}
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-muted-foreground">
+            <Icon name="Loader" size={20} className="animate-spin mr-2" />Загрузка…
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filtered.map(lead => (
+              <div key={lead.id} className="bg-card border border-border rounded-xl px-5 py-4 flex items-start gap-4 hover:shadow-sm transition-shadow">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-foreground">{lead.company}</span>
+                    {lead.deal_id && <span className="badge-status bg-green-50 text-green-600"><span className="w-1.5 h-1.5 rounded-full bg-current" />В сделке</span>}
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-muted-foreground">
+                    {lead.contact_name && <span>{lead.contact_name}</span>}
+                    {lead.contact_phone && <span className="font-mono-nums">{lead.contact_phone}</span>}
+                    {lead.position && <span>· {lead.position}</span>}
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground mt-1">
+                    <span>Источник: <span className="text-foreground">{lead.source}</span></span>
+                    <span>РП: <span className="text-foreground">{lead.manager_display || lead.manager_name}</span></span>
+                    <span>{new Date(lead.created_at).toLocaleDateString("ru-RU")}</span>
+                  </div>
+                  {lead.comment && <div className="text-xs text-muted-foreground mt-1 italic">{lead.comment}</div>}
+                </div>
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <span className={`badge-status ${LEAD_STAGE_COLOR[lead.stage] ?? "bg-muted text-muted-foreground"}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-current" />{lead.stage}
+                  </span>
+                  {!lead.deal_id && (
+                    <select
+                      className="text-xs border border-border rounded px-2 py-1 bg-background"
+                      value={lead.stage}
+                      disabled={updatingId === lead.id}
+                      onChange={e => changeStage(lead.id, e.target.value)}
+                    >
+                      {LEAD_STAGES.map(s => <option key={s}>{s}</option>)}
+                    </select>
+                  )}
+                </div>
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <div className="text-center py-16 text-muted-foreground text-sm">Нет лидов по выбранным фильтрам</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {showForm && <LeadForm users={users} onSave={l => { setLeads(ls => [l, ...ls]); setShowForm(false); }} onClose={() => setShowForm(false)} />}
+    </div>
+  );
+}
+
+// ── REPORTS ───────────────────────────────────────────────────────────────────
+function Reports() {
+  const [users, setUsers] = useState<PUser[]>([]);
+  const [managerFilter, setManagerFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date(); d.setMonth(d.getMonth() - 1);
+    return d.toISOString().slice(0, 10);
+  });
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [funnel, setFunnel] = useState<{ stage: string; count: number }[]>([]);
+  const [converted, setConverted] = useState(0);
+  const [sources, setSources] = useState<{ source: string; leads_count: number; deals_count: number }[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch(`${LEADS_URL}?action=users`).then(r => r.json()).then(setUsers);
+  }, []);
+
+  useEffect(() => {
+    loadReports();
+  }, [dateFrom, dateTo, managerFilter]);
+
+  async function loadReports() {
+    setLoading(true);
+    const mgr = managerFilter ? `&manager_id=${managerFilter}` : "";
+    const [fRes, sRes] = await Promise.all([
+      fetch(`${LEADS_URL}?action=funnel&date_from=${dateFrom}&date_to=${dateTo}${mgr}`).then(r => r.json()),
+      fetch(`${LEADS_URL}?action=sources&date_from=${dateFrom}&date_to=${dateTo}${mgr}`).then(r => r.json()),
+    ]);
+    setFunnel(fRes.funnel || []);
+    setConverted(fRes.converted || 0);
+    setSources(sRes);
+    setLoading(false);
+  }
+
+  const totalLeads = funnel.reduce((s, f) => s + Number(f.count), 0);
+  const maxCount = Math.max(...funnel.map(f => Number(f.count)), 1);
+  const maxSrc = Math.max(...sources.map(s => Number(s.leads_count)), 1);
+
+  const inp = "border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none";
+
+  return (
+    <div>
+      <PageHeader title="Отчёты" subtitle="Воронка продаж и источники лидов" />
+
+      <div className="p-8 space-y-6">
+        {/* Фильтры периода */}
+        <div className="bg-card border border-border rounded-xl px-5 py-4 flex flex-wrap gap-4 items-end">
+          <div>
+            <div className="text-xs text-muted-foreground mb-1">Период с</div>
+            <input type="date" className={inp} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground mb-1">По</div>
+            <input type="date" className={inp} value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground mb-1">Руководитель проекта</div>
+            <select className={inp} value={managerFilter} onChange={e => setManagerFilter(e.target.value)}>
+              <option value="">Все</option>
+              {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          </div>
+          {loading && <Icon name="Loader" size={18} className="animate-spin text-muted-foreground mb-2" />}
+        </div>
+
+        {/* Воронка */}
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-border flex items-center justify-between">
+            <div className="font-semibold text-foreground">Воронка продаж</div>
+            <div className="text-xs text-muted-foreground">Всего лидов: <span className="font-semibold text-foreground">{totalLeads}</span> · Конвертировано в сделки: <span className="font-semibold text-green-600">{converted}</span></div>
+          </div>
+          <div className="p-5 space-y-3">
+            {LEAD_STAGES.map((stageName, i) => {
+              const row = funnel.find(f => f.stage === stageName);
+              const count = Number(row?.count ?? 0);
+              const pct = totalLeads > 0 ? Math.round((count / totalLeads) * 100) : 0;
+              const barPct = Math.round((count / maxCount) * 100);
+              return (
+                <div key={stageName} className="flex items-center gap-4">
+                  <div className="w-36 text-sm text-muted-foreground shrink-0">
+                    <span className="text-xs text-muted-foreground/60 mr-1">шаг {i + 1}</span>{stageName}
+                  </div>
+                  <div className="flex-1 bg-muted/40 rounded-full h-7 overflow-hidden relative">
+                    <div
+                      className="h-full rounded-full flex items-center px-3 transition-all duration-500"
+                      style={{
+                        width: `${Math.max(barPct, 4)}%`,
+                        background: ["#3b82f6","#eab308","#f97316","#a855f7"][i],
+                        opacity: 0.85
+                      }}
+                    />
+                    <span className="absolute inset-0 flex items-center px-3 text-xs font-medium text-foreground">{count}</span>
+                  </div>
+                  <div className="w-12 text-right text-sm font-mono-nums text-muted-foreground">{pct}%</div>
+                </div>
+              );
+            })}
+            {converted > 0 && (
+              <div className="flex items-center gap-4">
+                <div className="w-36 text-sm text-green-600 shrink-0 font-medium">✓ Конвертировано</div>
+                <div className="flex-1 bg-muted/40 rounded-full h-7 overflow-hidden relative">
+                  <div className="h-full rounded-full bg-green-500 opacity-80 transition-all duration-500"
+                    style={{ width: `${Math.max(Math.round((converted / maxCount) * 100), 4)}%` }} />
+                  <span className="absolute inset-0 flex items-center px-3 text-xs font-medium text-foreground">{converted}</span>
+                </div>
+                <div className="w-12 text-right text-sm font-mono-nums text-muted-foreground">{totalLeads > 0 ? Math.round((converted / totalLeads) * 100) : 0}%</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Источники */}
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-border">
+            <div className="font-semibold text-foreground">Источники лидов</div>
+          </div>
+          {sources.length === 0 ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">Нет данных за выбранный период</div>
+          ) : (
+            <div className="p-5 space-y-4">
+              {sources.map(src => {
+                const pct = Math.round((Number(src.leads_count) / maxSrc) * 100);
+                const convPct = Number(src.leads_count) > 0 ? Math.round((Number(src.deals_count) / Number(src.leads_count)) * 100) : 0;
+                return (
+                  <div key={src.source}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="text-sm font-medium text-foreground">{src.source}</div>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span>Лидов: <span className="font-mono-nums font-semibold text-foreground">{src.leads_count}</span></span>
+                        <span>Сделок: <span className="font-mono-nums font-semibold text-green-600">{src.deals_count}</span></span>
+                        <span>Конверсия: <span className="font-mono-nums font-semibold text-foreground">{convPct}%</span></span>
+                      </div>
+                    </div>
+                    <div className="bg-muted/40 rounded-full h-4 overflow-hidden">
+                      <div className="h-full bg-primary/70 rounded-full transition-all duration-500" style={{ width: `${Math.max(pct, 2)}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
