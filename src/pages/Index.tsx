@@ -1640,7 +1640,7 @@ function LeadForm({ users, onSave, onClose }: { users: PUser[]; onSave: (lead: L
 
 type Communication = { id: number; lead_id: number; comm_date: string; text: string; created_at: string };
 
-function CommPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
+function CommPanel({ lead, onClose, onNewComm }: { lead: Lead; onClose: () => void; onNewComm: (c: Communication) => void }) {
   const [comms, setComms] = useState<Communication[]>([]);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -1664,6 +1664,7 @@ function CommPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
     });
     const row = await res.json();
     setComms(c => [row, ...c]);
+    onNewComm(row);
     setText("");
     setSaving(false);
   }
@@ -1752,13 +1753,26 @@ function Leads() {
   const [managerFilter, setManagerFilter] = useState("");
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [commLead, setCommLead] = useState<Lead | null>(null);
+  const [lastComms, setLastComms] = useState<Record<number, Communication>>({});
 
-  useEffect(() => {
-    Promise.all([
+  async function loadData() {
+    const [l, u] = await Promise.all([
       fetch(LEADS_URL).then(r => r.json()),
       fetch(`${LEADS_URL}?action=users`).then(r => r.json()),
-    ]).then(([l, u]) => { setLeads(l); setUsers(u); setLoading(false); });
-  }, []);
+    ]);
+    setLeads(l);
+    setUsers(u);
+    // Подгружаем последнюю коммуникацию по каждому лиду
+    const commsMap: Record<number, Communication> = {};
+    await Promise.all((l as Lead[]).map(async (lead: Lead) => {
+      const comms = await fetch(`${LEADS_URL}?action=communications&lead_id=${lead.id}`).then(r => r.json());
+      if (comms.length > 0) commsMap[lead.id] = comms[0];
+    }));
+    setLastComms(commsMap);
+    setLoading(false);
+  }
+
+  useEffect(() => { loadData(); }, []);
 
   async function changeStage(id: number, stage: string) {
     setUpdatingId(id);
@@ -1860,6 +1874,17 @@ function Leads() {
                     <span>{new Date(lead.created_at).toLocaleDateString("ru-RU")}</span>
                   </div>
                   {lead.comment && <div className="text-xs text-muted-foreground mt-1 italic">{lead.comment}</div>}
+                  {lastComms[lead.id] && (
+                    <div className="mt-2 flex items-start gap-1.5 text-xs text-foreground bg-muted/40 rounded-lg px-3 py-2 border border-border/50">
+                      <Icon name="MessageSquare" size={11} className="text-muted-foreground mt-0.5 shrink-0" />
+                      <span>
+                        <span className="font-mono-nums text-muted-foreground mr-1.5">
+                          {new Date(lastComms[lead.id].comm_date).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+                        </span>
+                        {lastComms[lead.id].text}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">
                   <span className={`badge-status ${LEAD_STAGE_COLOR[lead.stage] ?? "bg-muted text-muted-foreground"}`}>
@@ -1892,7 +1917,13 @@ function Leads() {
       </div>
 
       {showForm && <LeadForm users={users} onSave={l => { setLeads(ls => [l, ...ls]); setShowForm(false); }} onClose={() => setShowForm(false)} />}
-      {commLead && <CommPanel lead={commLead} onClose={() => setCommLead(null)} />}
+      {commLead && (
+        <CommPanel
+          lead={commLead}
+          onClose={() => setCommLead(null)}
+          onNewComm={c => setLastComms(prev => ({ ...prev, [c.lead_id]: c }))}
+        />
+      )}
     </div>
   );
 }
