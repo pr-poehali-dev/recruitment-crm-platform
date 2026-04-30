@@ -101,6 +101,18 @@ def handler(event: dict, context) -> dict:
             cur.close(); conn.close()
             return {'statusCode': 200, 'headers': headers, 'body': json.dumps([dict(r) for r in rows], default=str)}
 
+        if action == 'communications':
+            lead_id = int(qs.get('lead_id', 0))
+            cur.execute("""
+                SELECT id, lead_id, comm_date, text, created_at
+                FROM lead_communications
+                WHERE lead_id = %s
+                ORDER BY comm_date DESC, created_at DESC
+            """ % lead_id)
+            rows = cur.fetchall()
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': headers, 'body': json.dumps([dict(r) for r in rows], default=str)}
+
         # Список лидов
         date_from = qs.get('date_from', '2000-01-01')
         date_to = qs.get('date_to', '2100-01-01')
@@ -167,6 +179,19 @@ def handler(event: dict, context) -> dict:
             """ % (stage, lid))
             conn.commit(); cur.close(); conn.close()
             return {'statusCode': 200, 'headers': headers, 'body': json.dumps({'ok': True})}
+
+        if act == 'add_communication':
+            lead_id = int(body['lead_id'])
+            comm_date = body['comm_date'].replace("'","''")
+            text = body['text'].replace("'","''")
+            cur.execute("""
+                INSERT INTO lead_communications (lead_id, comm_date, text)
+                VALUES (%s, '%s', '%s')
+                RETURNING id, comm_date, text, created_at
+            """ % (lead_id, comm_date, text))
+            row = dict(cur.fetchone())
+            conn.commit(); cur.close(); conn.close()
+            return {'statusCode': 201, 'headers': headers, 'body': json.dumps(row, default=str)}
 
         if act == 'convert':
             lid = int(body['id'])
