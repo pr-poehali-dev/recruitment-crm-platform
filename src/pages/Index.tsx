@@ -1754,6 +1754,10 @@ function Leads() {
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [commLead, setCommLead] = useState<Lead | null>(null);
   const [lastComms, setLastComms] = useState<Record<number, Communication>>({});
+  const [quickCommId, setQuickCommId] = useState<number | null>(null);
+  const [quickDate, setQuickDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [quickText, setQuickText] = useState("");
+  const [quickSaving, setQuickSaving] = useState(false);
 
   async function loadData() {
     const [l, u] = await Promise.all([
@@ -1773,6 +1777,22 @@ function Leads() {
   }
 
   useEffect(() => { loadData(); }, []);
+
+  async function saveQuickComm(leadId: number) {
+    if (!quickText.trim()) return;
+    setQuickSaving(true);
+    const res = await fetch(LEADS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "add_communication", lead_id: leadId, comm_date: quickDate, text: quickText }),
+    });
+    const row = await res.json();
+    setLastComms(prev => ({ ...prev, [leadId]: row }));
+    setQuickCommId(null);
+    setQuickText("");
+    setQuickDate(new Date().toISOString().slice(0, 10));
+    setQuickSaving(false);
+  }
 
   async function changeStage(id: number, stage: string) {
     setUpdatingId(id);
@@ -1874,16 +1894,63 @@ function Leads() {
                     <span>{new Date(lead.created_at).toLocaleDateString("ru-RU")}</span>
                   </div>
                   {lead.comment && <div className="text-xs text-muted-foreground mt-1 italic">{lead.comment}</div>}
-                  {lastComms[lead.id] && (
+                  {/* Последняя коммуникация */}
+                  {lastComms[lead.id] && quickCommId !== lead.id && (
                     <div className="mt-2 flex items-start gap-1.5 text-xs text-foreground bg-muted/40 rounded-lg px-3 py-2 border border-border/50">
                       <Icon name="MessageSquare" size={11} className="text-muted-foreground mt-0.5 shrink-0" />
-                      <span>
+                      <span className="flex-1">
                         <span className="font-mono-nums text-muted-foreground mr-1.5">
                           {new Date(lastComms[lead.id].comm_date).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" })}
                         </span>
                         {lastComms[lead.id].text}
                       </span>
                     </div>
+                  )}
+
+                  {/* Быстрая форма коммуникации */}
+                  {quickCommId === lead.id ? (
+                    <div className="mt-2 bg-muted/30 border border-primary/30 rounded-lg px-3 py-2.5 space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="date"
+                          className="border border-border rounded px-2 py-1 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary w-32 shrink-0"
+                          value={quickDate}
+                          onChange={e => setQuickDate(e.target.value)}
+                        />
+                        <textarea
+                          autoFocus
+                          className="flex-1 border border-border rounded px-2 py-1 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                          rows={2}
+                          placeholder="Что обсуждали, о чём договорились…"
+                          value={quickText}
+                          onChange={e => setQuickText(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveQuickComm(lead.id); }}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => saveQuickComm(lead.id)}
+                          disabled={quickSaving || !quickText.trim()}
+                          className="text-xs bg-primary text-primary-foreground px-3 py-1 rounded hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        >
+                          {quickSaving ? "…" : "Сохранить"}
+                        </button>
+                        <button
+                          onClick={() => { setQuickCommId(null); setQuickText(""); }}
+                          className="text-xs text-muted-foreground hover:text-foreground px-2 py-1"
+                        >
+                          Отмена
+                        </button>
+                        <span className="text-xs text-muted-foreground self-center ml-auto hidden sm:block">⌘Enter</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setQuickCommId(lead.id); setQuickText(""); setQuickDate(new Date().toISOString().slice(0, 10)); }}
+                      className="mt-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      <Icon name="Plus" size={11} />Добавить коммуникацию
+                    </button>
                   )}
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">
@@ -1904,7 +1971,7 @@ function Leads() {
                     onClick={() => setCommLead(lead)}
                     className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary border border-border rounded px-2 py-1 hover:border-primary/40 transition-colors"
                   >
-                    <Icon name="MessageSquare" size={12} />Коммуникации
+                    <Icon name="History" size={12} />История
                   </button>
                 </div>
               </div>
