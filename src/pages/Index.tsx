@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 
 const AUTH_URL = "https://functions.poehali.dev/de8e9893-03eb-4917-803b-d9728b7eb2a7";
@@ -1694,6 +1694,7 @@ function Database() {
 
 // ── LEADS ─────────────────────────────────────────────────────────────────────
 const LEADS_URL = "https://functions.poehali.dev/44ca6591-a746-4f6a-948f-beb2bde38d0f";
+const PARSE_LEAD_URL = "https://functions.poehali.dev/8ffd6b9d-515a-49c4-b227-a3884e0cadbe";
 
 const LEAD_SOURCES = ["Яндекс Директ", "2ГИС", "Входящий звонок", "Рекомендация", "Старая база", "Другое"];
 const LEAD_STAGES = ["Лид", "Переговоры", "Договор", "Ожидание оплаты"];
@@ -1725,6 +1726,123 @@ type Lead = {
 
 type PUser = { id: number; name: string; role: string };
 
+// ── SCREENSHOT MODAL ──────────────────────────────────────────────────────────
+type ParsedLead = { company: string; contact_name: string; position: string; contact_phone: string; contact_email: string; comment: string };
+
+function ScreenshotModal({ onParsed, onClose }: { onParsed: (data: ParsedLead) => void; onClose: () => void }) {
+  const [dragging, setDragging] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [parsing, setParsing] = useState(false);
+  const [error, setError] = useState("");
+  const fileRef = React.useRef<HTMLInputElement>(null);
+
+  function readFile(file: File) {
+    if (!file.type.startsWith('image/')) { setError("Загрузите изображение (PNG, JPG, WebP)"); return; }
+    const reader = new FileReader();
+    reader.onload = e => setPreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+    setError("");
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault(); setDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) readFile(file);
+  }
+
+  async function parse() {
+    if (!preview) return;
+    setParsing(true); setError("");
+    // Вытаскиваем base64 и тип из data URL
+    const [meta, b64] = preview.split(',');
+    const mimeMatch = meta.match(/data:(.*?);base64/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+    try {
+      const res = await fetch(PARSE_LEAD_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: b64, type: mimeType }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Ошибка распознавания'); setParsing(false); return; }
+      onParsed(data);
+    } catch {
+      setError('Не удалось подключиться к сервису распознавания');
+    }
+    setParsing(false);
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-semibold text-foreground text-base">Создать лид из скриншота</div>
+            <div className="text-xs text-muted-foreground mt-0.5">CRM распознает данные автоматически</div>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><Icon name="X" size={18} /></button>
+        </div>
+
+        {/* Зона загрузки */}
+        {!preview ? (
+          <div
+            onDragOver={e => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={onDrop}
+            onClick={() => fileRef.current?.click()}
+            className={`border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center cursor-pointer transition-all gap-3 ${dragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/30'}`}
+          >
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Icon name="ImageUp" size={22} className="text-primary" />
+            </div>
+            <div className="text-center">
+              <div className="text-sm font-medium text-foreground">Перетащите скриншот сюда</div>
+              <div className="text-xs text-muted-foreground mt-1">или нажмите для выбора файла</div>
+              <div className="text-xs text-muted-foreground mt-1 opacity-60">PNG, JPG, WebP — письма, сайты, визитки, соцсети</div>
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { if (e.target.files?.[0]) readFile(e.target.files[0]); }} />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="relative rounded-xl overflow-hidden border border-border bg-muted/20">
+              <img src={preview} alt="Скриншот" className="w-full max-h-56 object-contain" />
+              <button
+                onClick={() => { setPreview(null); setError(""); }}
+                className="absolute top-2 right-2 bg-background/90 rounded-full p-1 hover:bg-background shadow text-muted-foreground hover:text-foreground"
+              >
+                <Icon name="X" size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+            <Icon name="AlertCircle" size={14} className="shrink-0" />{error}
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            onClick={parse}
+            disabled={!preview || parsing}
+            className="flex-1 bg-primary text-primary-foreground text-sm py-2.5 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {parsing
+              ? <><Icon name="Loader" size={14} className="animate-spin" />Распознаю…</>
+              : <><Icon name="Sparkles" size={14} />Распознать и заполнить</>
+            }
+          </button>
+          <button onClick={onClose} className="px-4 text-sm border border-border rounded-lg hover:bg-muted/50 transition-colors">
+            Отмена
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LeadForm({ users, onSave, onClose }: { users: PUser[]; onSave: (lead: Lead) => void; onClose: () => void }) {
   const [form, setForm] = useState({
     company: "", contact_name: "", contact_phone: "", contact_email: "",
@@ -1732,8 +1850,34 @@ function LeadForm({ users, onSave, onClose }: { users: PUser[]; onSave: (lead: L
     manager_id: "", comment: "",
   });
   const [saving, setSaving] = useState(false);
+  const [showScreenshot, setShowScreenshot] = useState(false);
+  const [aiFields, setAiFields] = useState<Set<string>>(new Set());
 
-  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k: string, v: string) => {
+    setAiFields(prev => { const n = new Set(prev); n.delete(k); return n; });
+    setForm(f => ({ ...f, [k]: v }));
+  };
+
+  function applyParsed(data: ParsedLead) {
+    setForm(f => ({
+      ...f,
+      company: data.company || f.company,
+      contact_name: data.contact_name || f.contact_name,
+      contact_phone: data.contact_phone || f.contact_phone,
+      contact_email: data.contact_email || f.contact_email,
+      position: data.position || f.position,
+      comment: data.comment || f.comment,
+    }));
+    const filled = new Set<string>();
+    if (data.company) filled.add('company');
+    if (data.contact_name) filled.add('contact_name');
+    if (data.contact_phone) filled.add('contact_phone');
+    if (data.contact_email) filled.add('contact_email');
+    if (data.position) filled.add('position');
+    if (data.comment) filled.add('comment');
+    setAiFields(filled);
+    setShowScreenshot(false);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -1749,78 +1893,108 @@ function LeadForm({ users, onSave, onClose }: { users: PUser[]; onSave: (lead: L
     setSaving(false);
   }
 
-  const inp = "w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary";
-  const lbl = "block text-xs text-muted-foreground mb-1";
+  const inp = (field?: string) => `w-full border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary transition-colors ${field && aiFields.has(field) ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/20' : 'border-border'}`;
+  const lbl = "block text-xs text-muted-foreground mb-1 flex items-center gap-1";
+
+  const AiTag = ({ field }: { field: string }) => aiFields.has(field)
+    ? <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium ml-1">ИИ</span>
+    : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-background rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="font-semibold text-foreground text-lg">Новый лид</div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><Icon name="X" size={18} /></button>
-        </div>
-        <form onSubmit={submit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <label className={lbl}>Компания *</label>
-              <input className={inp} required value={form.company} onChange={e => set("company", e.target.value)} placeholder="ООО «Название»" />
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+        <div className="relative bg-background rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-2">
+            <div className="font-semibold text-foreground text-lg">Новый лид</div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowScreenshot(true)}
+                className="flex items-center gap-1.5 text-xs bg-primary/10 text-primary border border-primary/20 px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors font-medium"
+              >
+                <Icon name="Sparkles" size={13} />Из скриншота
+              </button>
+              <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><Icon name="X" size={18} /></button>
             </div>
-            <div>
-              <label className={lbl}>Контактное лицо</label>
-              <input className={inp} value={form.contact_name} onChange={e => set("contact_name", e.target.value)} placeholder="ФИО" />
+          </div>
+
+          {aiFields.size > 0 && (
+            <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2 text-xs text-primary">
+              <Icon name="Sparkles" size={12} />
+              Поля, помеченные <span className="font-semibold">ИИ</span>, заполнены автоматически — проверь и скорректируй при необходимости
             </div>
-            <div>
-              <label className={lbl}>Телефон</label>
-              <input className={inp} value={form.contact_phone} onChange={e => set("contact_phone", e.target.value)} placeholder="+7 900 000-00-00" />
-            </div>
-            <div>
-              <label className={lbl}>Email</label>
-              <input className={inp} type="email" value={form.contact_email} onChange={e => set("contact_email", e.target.value)} placeholder="email@company.ru" />
-            </div>
-            <div>
-              <label className={lbl}>Позиция на подбор</label>
-              <input className={inp} value={form.position} onChange={e => set("position", e.target.value)} placeholder="Бухгалтер, менеджер…" />
-            </div>
-            <div>
-              <label className={lbl}>Источник *</label>
-              <select className={inp} value={form.source} onChange={e => set("source", e.target.value)}>
-                {LEAD_SOURCES.map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-            {form.source === "Другое" && (
-              <div>
-                <label className={lbl}>Укажите источник</label>
-                <input className={inp} value={form.source_custom} onChange={e => set("source_custom", e.target.value)} placeholder="Источник" />
+          )}
+
+          <form onSubmit={submit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className={lbl}>Компания *<AiTag field="company" /></label>
+                <input className={inp('company')} required value={form.company} onChange={e => set("company", e.target.value)} placeholder="ООО «Название»" />
               </div>
-            )}
-            <div>
-              <label className={lbl}>Стадия</label>
-              <select className={inp} value={form.stage} onChange={e => set("stage", e.target.value)}>
-                {LEAD_STAGES.map(s => <option key={s}>{s}</option>)}
-              </select>
+              <div>
+                <label className={lbl}>Контактное лицо<AiTag field="contact_name" /></label>
+                <input className={inp('contact_name')} value={form.contact_name} onChange={e => set("contact_name", e.target.value)} placeholder="ФИО" />
+              </div>
+              <div>
+                <label className={lbl}>Должность ЛПР<AiTag field="position" /></label>
+                <input className={inp('position')} value={form.position} onChange={e => set("position", e.target.value)} placeholder="Директор, HR…" />
+              </div>
+              <div>
+                <label className={lbl}>Телефон<AiTag field="contact_phone" /></label>
+                <input className={inp('contact_phone')} value={form.contact_phone} onChange={e => set("contact_phone", e.target.value)} placeholder="+7 900 000-00-00" />
+              </div>
+              <div>
+                <label className={lbl}>Email<AiTag field="contact_email" /></label>
+                <input className={inp('contact_email')} value={form.contact_email} onChange={e => set("contact_email", e.target.value)} placeholder="email@company.ru" />
+              </div>
+              <div>
+                <label className={lbl}>Источник *</label>
+                <select className={inp()} value={form.source} onChange={e => set("source", e.target.value)}>
+                  {LEAD_SOURCES.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              {form.source === "Другое" && (
+                <div>
+                  <label className={lbl}>Укажите источник</label>
+                  <input className={inp()} value={form.source_custom} onChange={e => set("source_custom", e.target.value)} placeholder="Источник" />
+                </div>
+              )}
+              <div>
+                <label className={lbl}>Стадия</label>
+                <select className={inp()} value={form.stage} onChange={e => set("stage", e.target.value)}>
+                  {LEAD_STAGES.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className={form.source === "Другое" ? "" : "col-span-2"}>
+                <label className={lbl}>Руководитель проекта *</label>
+                <select className={inp()} required value={form.manager_id} onChange={e => set("manager_id", e.target.value)}>
+                  <option value="">— выберите —</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className={lbl}>Комментарий<AiTag field="comment" /></label>
+                <textarea className={`${inp('comment')} resize-none`} rows={2} value={form.comment} onChange={e => set("comment", e.target.value)} placeholder="Заметки по лиду…" />
+              </div>
             </div>
-            <div className={form.source === "Другое" ? "" : "col-span-2"}>
-              <label className={lbl}>Руководитель проекта *</label>
-              <select className={inp} required value={form.manager_id} onChange={e => set("manager_id", e.target.value)}>
-                <option value="">— выберите —</option>
-                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
+            <div className="flex gap-3 pt-2">
+              <button type="submit" disabled={saving} className="flex-1 bg-primary text-primary-foreground text-sm py-2 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50">
+                {saving ? "Сохраняю…" : "Создать лид"}
+              </button>
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted/50 transition-colors">Отмена</button>
             </div>
-            <div className="col-span-2">
-              <label className={lbl}>Комментарий</label>
-              <textarea className={`${inp} resize-none`} rows={2} value={form.comment} onChange={e => set("comment", e.target.value)} placeholder="Заметки по лиду…" />
-            </div>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button type="submit" disabled={saving} className="flex-1 bg-primary text-primary-foreground text-sm py-2 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50">
-              {saving ? "Сохраняю…" : "Создать лид"}
-            </button>
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted/50 transition-colors">Отмена</button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
-    </div>
+
+      {showScreenshot && (
+        <ScreenshotModal
+          onParsed={applyParsed}
+          onClose={() => setShowScreenshot(false)}
+        />
+      )}
+    </>
   );
 }
 
