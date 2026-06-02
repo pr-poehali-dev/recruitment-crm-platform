@@ -1,7 +1,11 @@
 import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 
-type Section = "dashboard" | "clients" | "tasks" | "deals" | "digitizing" | "database" | "leads" | "reports";
+const AUTH_URL = "https://functions.poehali.dev/de8e9893-03eb-4917-803b-d9728b7eb2a7";
+
+type AuthUser = { id: number; full_name: string; email: string; role: string; company_id: number; company_name: string };
+
+type Section = "dashboard" | "clients" | "tasks" | "deals" | "digitizing" | "database" | "leads" | "reports" | "employees";
 
 const NAV = [
   { id: "dashboard", label: "Дашборд", icon: "LayoutDashboard" },
@@ -12,14 +16,154 @@ const NAV = [
   { id: "digitizing", label: "Оцифровка", icon: "BarChart2" },
   { id: "database", label: "База данных", icon: "Database" },
   { id: "reports", label: "Отчёты", icon: "PieChart" },
+  { id: "employees", label: "Сотрудники", icon: "UserCheck" },
 ] as const;
 
+// ── AUTH SCREENS ──────────────────────────────────────────────────────────────
+function AuthScreen({ onAuth }: { onAuth: (token: string, user: AuthUser) => void }) {
+  const [companyExists, setCompanyExists] = useState<boolean | null>(null);
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [form, setForm] = useState({ company_name: "", full_name: "", email: "", password: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch(`${AUTH_URL}?action=company_exists`)
+      .then(r => r.json())
+      .then(d => {
+        setCompanyExists(d.exists);
+        setMode(d.exists ? "login" : "register");
+      });
+  }, []);
+
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(""); setLoading(true);
+    const action = mode === "register" ? "register" : "login";
+    const res = await fetch(AUTH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...form }),
+    });
+    const data = await res.json();
+    setLoading(false);
+    if (!res.ok) { setError(data.error || "Ошибка"); return; }
+    localStorage.setItem("crm_token", data.token);
+    onAuth(data.token, data.user);
+  }
+
+  if (companyExists === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Icon name="Loader" size={24} className="animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const inp = "w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30";
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 mb-4">
+            <Icon name="Building2" size={22} className="text-primary" />
+          </div>
+          <h1 className="text-xl font-semibold text-foreground">
+            {mode === "register" ? "Создать компанию" : "Войти в CRM"}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {mode === "register" ? "Вы станете CEO и сможете добавлять сотрудников" : "Введите email и пароль"}
+          </p>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+          <form onSubmit={submit} className="space-y-4">
+            {mode === "register" && (
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1.5">Название компании</label>
+                <input className={inp} required placeholder="ООО «Ромашка»" value={form.company_name} onChange={e => set("company_name", e.target.value)} />
+              </div>
+            )}
+            {mode === "register" && (
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1.5">Ваше ФИО</label>
+                <input className={inp} required placeholder="Иванов Иван Иванович" value={form.full_name} onChange={e => set("full_name", e.target.value)} />
+              </div>
+            )}
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1.5">Email</label>
+              <input className={inp} type="email" required placeholder="you@company.ru" value={form.email} onChange={e => set("email", e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1.5">Пароль</label>
+              <input className={inp} type="password" required placeholder={mode === "register" ? "Минимум 6 символов" : "Ваш пароль"} value={form.password} onChange={e => set("password", e.target.value)} />
+            </div>
+            {error && <div className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</div>}
+            <button type="submit" disabled={loading} className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
+              {loading ? "Загрузка…" : mode === "register" ? "Зарегистрироваться" : "Войти"}
+            </button>
+          </form>
+
+          {companyExists && (
+            <div className="mt-4 text-center text-xs text-muted-foreground">
+              Нет доступа? Обратитесь к администратору
+            </div>
+          )}
+          {!companyExists && mode === "login" && (
+            <button onClick={() => setMode("register")} className="mt-4 w-full text-center text-xs text-primary hover:underline">
+              Создать компанию
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function Index() {
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem("crm_token"));
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [active, setActive] = useState<Section>("dashboard");
+
+  useEffect(() => {
+    if (!token) { setAuthLoading(false); return; }
+    fetch(`${AUTH_URL}?action=me`, { headers: { "X-Auth-Token": token } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) setUser(data);
+        else { localStorage.removeItem("crm_token"); setToken(null); }
+        setAuthLoading(false);
+      });
+  }, [token]);
+
+  function handleAuth(t: string, u: AuthUser) {
+    setToken(t); setUser(u);
+  }
+
+  function handleLogout() {
+    if (token) fetch(AUTH_URL, { method: "POST", headers: { "Content-Type": "application/json", "X-Auth-Token": token }, body: JSON.stringify({ action: "logout" }) });
+    localStorage.removeItem("crm_token");
+    setToken(null); setUser(null);
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Icon name="Loader" size={24} className="animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!token || !user) return <AuthScreen onAuth={handleAuth} />;
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <Sidebar active={active} onSelect={setActive} />
+      <Sidebar active={active} onSelect={setActive} user={user} onLogout={handleLogout} />
       <main className="flex-1 overflow-y-auto">
         {active === "dashboard" && <Dashboard />}
         {active === "clients" && <Clients />}
@@ -29,19 +173,28 @@ export default function Index() {
         {active === "database" && <Database />}
         {active === "leads" && <Leads />}
         {active === "reports" && <Reports />}
+        {active === "employees" && <Employees token={token} user={user} />}
       </main>
     </div>
   );
 }
 
-function Sidebar({ active, onSelect }: { active: Section; onSelect: (s: Section) => void }) {
+function Sidebar({ active, onSelect, user, onLogout }: {
+  active: Section;
+  onSelect: (s: Section) => void;
+  user: AuthUser;
+  onLogout: () => void;
+}) {
+  const initials = user.full_name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
+  const ROLE_LABEL: Record<string, string> = { ceo: "CEO", team_lead: "Team Lead", employee: "Сотрудник" };
+
   return (
     <aside className="w-56 border-r border-border flex flex-col bg-card shrink-0">
       <div className="px-5 py-5 border-b border-border">
-        <div className="text-sm font-semibold text-foreground tracking-tight">CRM</div>
-        <div className="text-xs text-muted-foreground mt-0.5">Платформа управления</div>
+        <div className="text-sm font-semibold text-foreground tracking-tight">{user.company_name}</div>
+        <div className="text-xs text-muted-foreground mt-0.5">CRM-платформа</div>
       </div>
-      <nav className="flex-1 p-3 space-y-0.5">
+      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         {NAV.map((item) => (
           <button
             key={item.id}
@@ -54,12 +207,21 @@ function Sidebar({ active, onSelect }: { active: Section; onSelect: (s: Section)
         ))}
       </nav>
       <div className="p-3 border-t border-border">
-        <div className="flex items-center gap-2.5 px-3 py-2">
-          <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary">А</div>
-          <div>
-            <div className="text-xs font-medium text-foreground">Администратор</div>
-            <div className="text-xs text-muted-foreground">admin@company.ru</div>
+        <div className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-muted/50 group transition-colors">
+          <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
+            {initials}
           </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-medium text-foreground truncate">{user.full_name}</div>
+            <div className="text-xs text-muted-foreground">{ROLE_LABEL[user.role] ?? user.role}</div>
+          </div>
+          <button
+            onClick={onLogout}
+            title="Выйти"
+            className="text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <Icon name="LogOut" size={14} />
+          </button>
         </div>
       </div>
     </aside>
@@ -2139,6 +2301,177 @@ function Reports() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── EMPLOYEES ─────────────────────────────────────────────────────────────────
+type Employee = { id: number; full_name: string; email: string; role: string; is_active: boolean; created_at: string };
+
+const ROLE_OPTIONS = [
+  { value: "employee", label: "Сотрудник" },
+  { value: "team_lead", label: "Team Lead" },
+];
+const ROLE_LABEL: Record<string, string> = { ceo: "CEO", team_lead: "Team Lead", employee: "Сотрудник" };
+const ROLE_COLOR: Record<string, string> = {
+  ceo: "bg-purple-50 text-purple-600",
+  team_lead: "bg-blue-50 text-blue-600",
+  employee: "bg-muted text-muted-foreground",
+};
+
+function Employees({ token, user }: { token: string; user: AuthUser }) {
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ full_name: "", email: "", role: "employee" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [lastInvite, setLastInvite] = useState<{ name: string; email: string; password: string } | null>(null);
+
+  const canInvite = user.role === "ceo" || user.role === "team_lead";
+
+  useEffect(() => {
+    fetch(`${AUTH_URL}?action=employees`, { headers: { "X-Auth-Token": token } })
+      .then(r => r.json())
+      .then(d => { setEmployees(d); setLoading(false); });
+  }, []);
+
+  const setF = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  async function invite(e: React.FormEvent) {
+    e.preventDefault();
+    setError(""); setSaving(true);
+    const res = await fetch(AUTH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Auth-Token": token },
+      body: JSON.stringify({ action: "invite", ...form }),
+    });
+    const data = await res.json();
+    setSaving(false);
+    if (!res.ok) { setError(data.error || "Ошибка"); return; }
+    setEmployees(e => [...e, data]);
+    setLastInvite({ name: data.full_name, email: data.email, password: data.temp_password });
+    setShowForm(false);
+    setForm({ full_name: "", email: "", role: "employee" });
+  }
+
+  const inp = "w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary";
+
+  return (
+    <div>
+      <PageHeader
+        title="Сотрудники"
+        subtitle={loading ? "Загрузка…" : `${employees.length} сотрудников`}
+        action={canInvite && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-2 bg-primary text-primary-foreground text-sm px-4 py-2 rounded hover:bg-primary/90 transition-colors"
+          >
+            <Icon name="UserPlus" size={14} />Добавить сотрудника
+          </button>
+        )}
+      />
+
+      <div className="p-8 space-y-3">
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-muted-foreground">
+            <Icon name="Loader" size={20} className="animate-spin mr-2" />Загрузка…
+          </div>
+        ) : (
+          employees.map(emp => {
+            const initials = emp.full_name.split(" ").slice(0, 2).map((w: string) => w[0]).join("").toUpperCase();
+            return (
+              <div key={emp.id} className="bg-card border border-border rounded-xl px-5 py-4 flex items-center gap-4">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary shrink-0">
+                  {initials}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-foreground">{emp.full_name}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{emp.email}</div>
+                </div>
+                <span className={`badge-status ${ROLE_COLOR[emp.role] ?? "bg-muted text-muted-foreground"}`}>
+                  {ROLE_LABEL[emp.role] ?? emp.role}
+                </span>
+                <span className={`badge-status ${emp.is_active ? "bg-green-50 text-green-600" : "bg-muted text-muted-foreground"}`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                  {emp.is_active ? "Активен" : "Неактивен"}
+                </span>
+                <div className="text-xs text-muted-foreground shrink-0">
+                  {new Date(emp.created_at).toLocaleDateString("ru-RU")}
+                </div>
+              </div>
+            );
+          })
+        )}
+        {!loading && employees.length === 0 && (
+          <div className="text-center py-16 text-muted-foreground text-sm">Сотрудников пока нет</div>
+        )}
+      </div>
+
+      {/* Форма приглашения */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowForm(false)} />
+          <div className="relative bg-background rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="font-semibold text-foreground">Добавить сотрудника</div>
+              <button onClick={() => setShowForm(false)} className="text-muted-foreground hover:text-foreground">
+                <Icon name="X" size={18} />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">Сотрудник получит письмо с временным паролем на указанный email.</p>
+            <form onSubmit={invite} className="space-y-3">
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">ФИО *</label>
+                <input className={inp} required placeholder="Иванов Иван Иванович" value={form.full_name} onChange={e => setF("full_name", e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">Email *</label>
+                <input className={inp} type="email" required placeholder="employee@company.ru" value={form.email} onChange={e => setF("email", e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">Роль</label>
+                <select className={inp} value={form.role} onChange={e => setF("role", e.target.value)}>
+                  {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </div>
+              {error && <div className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</div>}
+              <div className="flex gap-3 pt-1">
+                <button type="submit" disabled={saving} className="flex-1 bg-primary text-primary-foreground text-sm py-2 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50">
+                  {saving ? "Отправляю…" : "Пригласить"}
+                </button>
+                <button type="button" onClick={() => setShowForm(false)} className="px-4 text-sm border border-border rounded-lg hover:bg-muted/50 transition-colors">
+                  Отмена
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Показ временного пароля */}
+      {lastInvite && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setLastInvite(null)} />
+          <div className="relative bg-background rounded-xl shadow-xl w-full max-w-sm p-6 text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+              <Icon name="Check" size={22} className="text-green-600" />
+            </div>
+            <div>
+              <div className="font-semibold text-foreground">{lastInvite.name} добавлен</div>
+              <div className="text-sm text-muted-foreground mt-1">Письмо отправлено на {lastInvite.email}</div>
+            </div>
+            <div className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-left">
+              <div className="text-xs text-muted-foreground mb-1">Временный пароль</div>
+              <div className="font-mono text-sm font-semibold text-foreground tracking-wider">{lastInvite.password}</div>
+              <div className="text-xs text-muted-foreground mt-1">Сохраните или сообщите сотруднику вручную</div>
+            </div>
+            <button onClick={() => setLastInvite(null)} className="w-full bg-primary text-primary-foreground text-sm py-2 rounded-lg hover:bg-primary/90 transition-colors">
+              Готово
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

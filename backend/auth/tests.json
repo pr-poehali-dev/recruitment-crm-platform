@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "company_exists check",
+      "method": "GET",
+      "path": "/?action=company_exists",
+      "expectedStatus": 200,
+      "expectedBody": {"exists": true},
+      "bodyMatcher": "partial"
+    }
+  ]
+}
