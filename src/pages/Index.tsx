@@ -21,27 +21,18 @@ const NAV = [
 
 // ── AUTH SCREENS ──────────────────────────────────────────────────────────────
 function AuthScreen({ onAuth }: { onAuth: (token: string, user: AuthUser) => void }) {
-  const [companyExists, setCompanyExists] = useState<boolean | null>(null);
-  const [mode, setMode] = useState<"login" | "register">("login");
+  // start | login | register
+  const [screen, setScreen] = useState<"start" | "login" | "register">("start");
   const [form, setForm] = useState({ company_name: "", full_name: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    fetch(`${AUTH_URL}?action=company_exists`)
-      .then(r => r.json())
-      .then(d => {
-        setCompanyExists(d.exists);
-        setMode(d.exists ? "login" : "register");
-      });
-  }, []);
-
-  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k: string, v: string) => { setError(""); setForm(f => ({ ...f, [k]: v })); };
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(""); setLoading(true);
-    const action = mode === "register" ? "register" : "login";
+    const action = screen === "register" ? "register" : "login";
     const res = await fetch(AUTH_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -54,68 +45,101 @@ function AuthScreen({ onAuth }: { onAuth: (token: string, user: AuthUser) => voi
     onAuth(data.token, data.user);
   }
 
-  if (companyExists === null) {
+  const inp = "w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30";
+
+  // ── Стартовый экран: две кнопки ──
+  if (screen === "start") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Icon name="Loader" size={24} className="animate-spin text-muted-foreground" />
+      <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
+        <div className="w-full max-w-sm">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-5">
+              <Icon name="Building2" size={26} className="text-primary" />
+            </div>
+            <h1 className="text-2xl font-semibold text-foreground">CRM-платформа</h1>
+            <p className="text-sm text-muted-foreground mt-2">Управление подбором персонала</p>
+          </div>
+          <div className="space-y-3">
+            <button
+              onClick={() => setScreen("login")}
+              className="w-full bg-primary text-primary-foreground py-3 rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+            >
+              <Icon name="LogIn" size={16} />Войти в систему
+            </button>
+            <button
+              onClick={() => setScreen("register")}
+              className="w-full bg-card border border-border text-foreground py-3 rounded-xl text-sm font-medium hover:bg-muted/50 transition-colors flex items-center justify-center gap-2"
+            >
+              <Icon name="PlusCircle" size={16} />Зарегистрировать компанию
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
 
-  const inp = "w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30";
-
+  // ── Форма входа / регистрации ──
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
+        <button
+          onClick={() => { setScreen("start"); setError(""); setForm({ company_name: "", full_name: "", email: "", password: "" }); }}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
+        >
+          <Icon name="ArrowLeft" size={14} />Назад
+        </button>
+
+        <div className="text-center mb-7">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 mb-4">
-            <Icon name="Building2" size={22} className="text-primary" />
+            <Icon name={screen === "register" ? "PlusCircle" : "LogIn"} size={20} className="text-primary" />
           </div>
           <h1 className="text-xl font-semibold text-foreground">
-            {mode === "register" ? "Создать компанию" : "Войти в CRM"}
+            {screen === "register" ? "Создать компанию" : "Войти в CRM"}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {mode === "register" ? "Вы станете CEO и сможете добавлять сотрудников" : "Введите email и пароль"}
+            {screen === "register" ? "Вы станете CEO и сможете добавлять сотрудников" : "Введите email и пароль"}
           </p>
         </div>
 
         <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
           <form onSubmit={submit} className="space-y-4">
-            {mode === "register" && (
-              <div>
-                <label className="block text-xs text-muted-foreground mb-1.5">Название компании</label>
-                <input className={inp} required placeholder="ООО «Ромашка»" value={form.company_name} onChange={e => set("company_name", e.target.value)} />
-              </div>
-            )}
-            {mode === "register" && (
-              <div>
-                <label className="block text-xs text-muted-foreground mb-1.5">Ваше ФИО</label>
-                <input className={inp} required placeholder="Иванов Иван Иванович" value={form.full_name} onChange={e => set("full_name", e.target.value)} />
-              </div>
+            {screen === "register" && (
+              <>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1.5">Название компании *</label>
+                  <input className={inp} required placeholder="ООО «Название»" value={form.company_name} onChange={e => set("company_name", e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1.5">Ваше ФИО *</label>
+                  <input className={inp} required placeholder="Иванова Анна Сергеевна" value={form.full_name} onChange={e => set("full_name", e.target.value)} />
+                </div>
+              </>
             )}
             <div>
-              <label className="block text-xs text-muted-foreground mb-1.5">Email</label>
+              <label className="block text-xs text-muted-foreground mb-1.5">Email *</label>
               <input className={inp} type="email" required placeholder="you@company.ru" value={form.email} onChange={e => set("email", e.target.value)} />
             </div>
             <div>
-              <label className="block text-xs text-muted-foreground mb-1.5">Пароль</label>
-              <input className={inp} type="password" required placeholder={mode === "register" ? "Минимум 6 символов" : "Ваш пароль"} value={form.password} onChange={e => set("password", e.target.value)} />
+              <label className="block text-xs text-muted-foreground mb-1.5">Пароль *</label>
+              <input className={inp} type="password" required placeholder={screen === "register" ? "Минимум 6 символов" : "Ваш пароль"} value={form.password} onChange={e => set("password", e.target.value)} />
             </div>
-            {error && <div className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</div>}
-            <button type="submit" disabled={loading} className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
-              {loading ? "Загрузка…" : mode === "register" ? "Зарегистрироваться" : "Войти"}
+            {error && (
+              <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2.5">
+                <Icon name="AlertCircle" size={14} className="mt-0.5 shrink-0" />{error}
+              </div>
+            )}
+            <button type="submit" disabled={loading} className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+              {loading
+                ? <><Icon name="Loader" size={14} className="animate-spin" />Загрузка…</>
+                : screen === "register" ? "Зарегистрировать компанию" : "Войти"
+              }
             </button>
           </form>
 
-          {companyExists && (
+          {screen === "login" && (
             <div className="mt-4 text-center text-xs text-muted-foreground">
-              Нет доступа? Обратитесь к администратору
+              Нет аккаунта? Обратитесь к администратору компании
             </div>
-          )}
-          {!companyExists && mode === "login" && (
-            <button onClick={() => setMode("register")} className="mt-4 w-full text-center text-xs text-primary hover:underline">
-              Создать компанию
-            </button>
           )}
         </div>
       </div>

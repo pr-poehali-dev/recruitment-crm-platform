@@ -1,6 +1,5 @@
 import os
 import json
-import hmac
 import hashlib
 import secrets
 import smtplib
@@ -13,7 +12,8 @@ def get_conn():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
 def hash_password(password: str) -> str:
-    return hmac.new(os.environ['JWT_SECRET'].encode(), password.encode(), hashlib.sha256).hexdigest()
+    salt = "crm_salt_v1"
+    return hashlib.sha256((salt + password + salt).encode()).hexdigest()
 
 def make_token() -> str:
     return secrets.token_hex(48)
@@ -26,16 +26,7 @@ def send_invite_email(to_email: str, full_name: str, company_name: str, password
     smtp_pass = os.environ.get('SMTP_PASSWORD', '')
     if not smtp_from or not smtp_pass:
         return
-    body = f"""Привет, {full_name}!
-
-Вас пригласили в CRM компании «{company_name}».
-
-Ваши данные для входа:
-  Email: {to_email}
-  Пароль: {password}
-
-Войдите и смените пароль при первом входе.
-"""
+    body = f"""Привет, {full_name}!\n\nВас пригласили в CRM компании «{company_name}».\n\nEmail: {to_email}\nПароль: {password}\n"""
     msg = MIMEText(body, 'plain', 'utf-8')
     msg['Subject'] = f'Приглашение в CRM — {company_name}'
     msg['From'] = smtp_from
@@ -45,10 +36,10 @@ def send_invite_email(to_email: str, full_name: str, company_name: str, password
             s.login(smtp_from, smtp_pass)
             s.sendmail(smtp_from, [to_email], msg.as_string())
     except Exception:
-        pass  # не блокируем если почта не настроена
+        pass
 
 def handler(event: dict, context) -> dict:
-    """Авторизация: регистрация CEO+компания, логин, инвайт сотрудника, список сотрудников, смена пароля"""
+    """Авторизация: регистрация CEO+компания, логин, инвайт сотрудника, список сотрудников"""
     headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -62,9 +53,8 @@ def handler(event: dict, context) -> dict:
     method = event.get('httpMethod', 'GET')
     qs = event.get('queryStringParameters') or {}
     action = qs.get('action', '')
-    auth_token = (event.get('headers') or {}).get('X-Auth-Token') or \
-                 (event.get('headers') or {}).get('x-auth-token') or \
-                 qs.get('token')
+    req_headers = event.get('headers') or {}
+    auth_token = req_headers.get('X-Auth-Token') or req_headers.get('x-auth-token') or qs.get('token')
 
     conn = get_conn()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -89,29 +79,24 @@ def handler(event: dict, context) -> dict:
         """ % auth_token.replace("'", "''"))
         return cur.fetchone()
 
-    # GET /me — проверка токена
     if method == 'GET' and action == 'me':
         user = get_current_user()
         if not user:
             return err('Не авторизован', 401)
         return ok(dict(user))
 
-    # GET /company_exists — есть ли уже компания (для экрана регистрации)
     if method == 'GET' and action == 'company_exists':
-        cur.execute("SELECT COUNT(*) as cnt FROM companies")
+        cur.execute("SELECT COUNT(*) as cnt FROM companies WHERE ceo_registered = TRUE")
         row = cur.fetchone()
         return ok({'exists': int(row['cnt']) > 0})
 
-    # GET /employees — список сотрудников (требует авторизации)
     if method == 'GET' and action == 'employees':
         user = get_current_user()
         if not user:
             return err('Не авторизован', 401)
         cur.execute("""
             SELECT id, full_name, email, role, is_active, created_at
-            FROM auth_users
-            WHERE company_id = %s
-            ORDER BY created_at
+            FROM auth_users WHERE company_id = %s ORDER BY created_at
         """ % int(user['company_id']))
         rows = cur.fetchall()
         return ok([dict(r) for r in rows])
@@ -120,15 +105,14 @@ def handler(event: dict, context) -> dict:
         body = json.loads(event.get('body') or '{}')
         act = body.get('action', '')
 
-        # Регистрация CEO + создание компании
         if act == 'register':
-            cur.execute("SELECT COUNT(*) as cnt FROM companies")
+            cur.execute("SELECT COUNT(*) as cnt FROM companies WHERE ceo_registered = TRUE")
             if int(cur.fetchone()['cnt']) > 0:
-                return err('Компания уже зарегистрирована')
+                return err('Компания уже зарегистрирована. Войдите или обратитесь к администратору.')
 
-            company_name = body.get('company_name', '').strip().replace("'", "''")
-            full_name = body.get('full_name', '').strip().replace("'", "''")
-            email = body.get('email', '').strip().lower().replace("'", "''")
+            company_name = body.get('company_name', '').strip()
+            full_name = body.get('full_name', '').strip()
+            email = body.get('email', '').strip().lower()
             password = body.get('password', '')
 
             if not company_name or not full_name or not email or not password:
@@ -136,27 +120,37 @@ def handler(event: dict, context) -> dict:
             if len(password) < 6:
                 return err('Пароль минимум 6 символов')
 
-            cur.execute("INSERT INTO companies (name) VALUES ('%s') RETURNING id" % company_name)
-            company_id = cur.fetchone()['id']
-
+            cn = company_name.replace("'", "''")
+            fn = full_name.replace("'", "''")
+            em = email.replace("'", "''")
             pw_hash = hash_password(password)
+
+            # Переиспользуем незавершённую компанию если есть
+            cur.execute("SELECT id FROM companies WHERE ceo_registered = FALSE LIMIT 1")
+            existing = cur.fetchone()
+            if existing:
+                company_id = existing['id']
+                cur.execute("UPDATE companies SET name='%s', is_active=TRUE WHERE id=%s" % (cn, company_id))
+            else:
+                cur.execute("INSERT INTO companies (name) VALUES ('%s') RETURNING id" % cn)
+                company_id = cur.fetchone()['id']
+
             cur.execute("""
                 INSERT INTO auth_users (company_id, full_name, email, password_hash, role)
-                VALUES (%s, '%s', '%s', '%s', 'ceo')
-                RETURNING id, full_name, email, role, company_id
-            """ % (company_id, full_name, email, pw_hash))
+                VALUES (%s, '%s', '%s', '%s', 'ceo') RETURNING id, full_name, email, role, company_id
+            """ % (company_id, fn, em, pw_hash))
             user = dict(cur.fetchone())
+
+            cur.execute("UPDATE companies SET ceo_registered=TRUE WHERE id=%s" % company_id)
 
             token = make_token()
             cur.execute("""
-                INSERT INTO auth_sessions (user_id, token, expires_at)
-                VALUES (%s, '%s', '%s')
+                INSERT INTO auth_sessions (user_id, token, expires_at) VALUES (%s, '%s', '%s')
             """ % (user['id'], token, token_expires()))
 
             conn.commit()
             return ok({'token': token, 'user': {**user, 'company_name': company_name}}, 201)
 
-        # Вход
         if act == 'login':
             email = body.get('email', '').strip().lower().replace("'", "''")
             password = body.get('password', '')
@@ -164,8 +158,7 @@ def handler(event: dict, context) -> dict:
 
             cur.execute("""
                 SELECT u.id, u.full_name, u.email, u.role, u.company_id, c.name as company_name
-                FROM auth_users u
-                JOIN companies c ON c.id = u.company_id
+                FROM auth_users u JOIN companies c ON c.id = u.company_id
                 WHERE u.email = '%s' AND u.password_hash = '%s' AND u.is_active = TRUE
             """ % (email, pw_hash))
             user = cur.fetchone()
@@ -174,14 +167,12 @@ def handler(event: dict, context) -> dict:
 
             token = make_token()
             cur.execute("""
-                INSERT INTO auth_sessions (user_id, token, expires_at)
-                VALUES (%s, '%s', '%s')
+                INSERT INTO auth_sessions (user_id, token, expires_at) VALUES (%s, '%s', '%s')
             """ % (user['id'], token, token_expires()))
 
             conn.commit()
             return ok({'token': token, 'user': dict(user)})
 
-        # Инвайт сотрудника (только CEO или team_lead)
         if act == 'invite':
             user = get_current_user()
             if not user:
@@ -205,17 +196,14 @@ def handler(event: dict, context) -> dict:
 
             cur.execute("""
                 INSERT INTO auth_users (company_id, full_name, email, password_hash, role, invited_by)
-                VALUES (%s, '%s', '%s', '%s', '%s', %s)
-                RETURNING id, full_name, email, role
+                VALUES (%s, '%s', '%s', '%s', '%s', %s) RETURNING id, full_name, email, role
             """ % (int(user['company_id']), full_name, email, pw_hash, role, int(user['id'])))
             new_user = dict(cur.fetchone())
             conn.commit()
 
             send_invite_email(email, full_name, user['company_name'], temp_password)
-
             return ok({**new_user, 'temp_password': temp_password}, 201)
 
-        # Смена пароля
         if act == 'change_password':
             user = get_current_user()
             if not user:
@@ -223,15 +211,13 @@ def handler(event: dict, context) -> dict:
             new_pw = body.get('new_password', '')
             if len(new_pw) < 6:
                 return err('Пароль минимум 6 символов')
-            pw_hash = hash_password(new_pw)
-            cur.execute("UPDATE auth_users SET password_hash = '%s' WHERE id = %s" % (pw_hash, int(user['id'])))
+            cur.execute("UPDATE auth_users SET password_hash='%s' WHERE id=%s" % (hash_password(new_pw), int(user['id'])))
             conn.commit()
             return ok({'ok': True})
 
-        # Выход
         if act == 'logout':
             if auth_token:
-                cur.execute("DELETE FROM auth_sessions WHERE token = '%s'" % auth_token.replace("'", "''"))
+                cur.execute("UPDATE auth_sessions SET expires_at=NOW() WHERE token='%s'" % auth_token.replace("'", "''"))
                 conn.commit()
             return ok({'ok': True})
 
